@@ -1,0 +1,62 @@
+[
+    {
+      "id": 1,
+      "type": "single-hop",
+      "question": "What are the specific BLEU scores achieved by the Transformer model on the WMT 2014 English-to-German and English-to-French translation tasks?",
+      "ground_truth": "The Transformer model achieves a BLEU score of 28.4 on the WMT 2014 English-to-German translation task, improving over existing best results and ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, it establishes a new single-model state-of-the-art BLEU score of 41.0."
+    },
+    {
+      "id": 2,
+      "type": "single-hop",
+      "question": "What is the exact mathematical equation used to calculate Scaled Dot-Product Attention in the paper?",
+      "ground_truth": "The formula for Scaled Dot-Product Attention is computed on a set of queries, keys, and values packed into matrices Q, K, and V: Attention(Q, K, V) = softmax((Q * K^T) / sqrt(d_k)) * V, where d_k represents the dimensionality of the keys."
+    },
+    {
+      "id": 3,
+      "type": "single-hop",
+      "question": "How many layers (N) make up the identical blocks in both the encoder and the decoder stacks of the Transformer architecture?",
+      "ground_truth": "Both the encoder and the decoder stacks are composed of an orchestration stack of N = 6 identical layers."
+    },
+    {
+      "id": 4,
+      "type": "multi-hop",
+      "question": "Why do the authors divide the query-key dot product by the scaling factor sqrt(d_k) in their attention mechanism?",
+      "ground_truth": "The authors suspect that for large values of d_k, the dot products grow large in magnitude, pushing the softmax function into regions with extremely small gradients (vanishing gradients). Dividing by the square root of d_k scales the dot products to counteract this effect and prevents the model from getting stuck during training."
+    },
+    {
+      "id": 5,
+      "type": "multi-hop",
+      "question": "What are the three distinct ways Multi-Head Attention is applied within the Transformer encoder-decoder architecture?",
+      "ground_truth": "1. In encoder-decoder attention layers, the queries come from the previous decoder layer, while the keys and values come from the output of the encoder. 2. In encoder self-attention layers, all queries, keys, and values come from the output of the previous layer in the encoder. 3. In decoder self-attention layers, each position attends to all positions in the decoder up to and including that position, using a causal mask to prevent looking at subsequent tokens."
+    },
+    {
+      "id": 6,
+      "type": "multi-hop",
+      "question": "Why does the Transformer require Positional Encodings, and what mathematical functions are used to generate them?",
+      "ground_truth": "Since the Transformer architecture dispenses with recurrence and convolutions entirely, it contains no inherent awareness of the relative or absolute positions of tokens in the sequence. To inject sequence order information, positional encodings are added to the input embeddings using sine and cosine functions of different frequencies, specifically: PE(pos, 2i) = sin(pos / 10000^(2i/d_model)) and PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))."
+    },
+    {
+      "id": 7,
+      "type": "abstract-architectural",
+      "question": "How does the computational complexity per layer of a Self-Attention layer compare to a Recurrent layer when the sequence length n is smaller than the representation dimensionality d?",
+      "ground_truth": "A Self-Attention layer has a computational complexity per layer of O(n^2 * d), whereas a Recurrent layer has a complexity of O(n * d^2). When the sequence length n is smaller than the representation dimensionality d (n < d), self-attention layers are computationally faster per layer than recurrent layers."
+    },
+    {
+      "id": 8,
+      "type": "abstract-architectural",
+      "question": "What modifications are made to the sub-layers within the Decoder stack to prevent leftward information flow during self-attention processing?",
+      "ground_truth": "The decoder stack introduces a third sub-layer to perform multi-head attention over the encoder output and modifies its internal self-attention sub-layer using masking. This causal masking, combined with position offsets, ensures that the predictions for position i can depend only on the known outputs at positions less than i."
+    },
+    {
+      "id": 9,
+      "type": "abstract-architectural",
+      "question": "What regularization techniques were implemented during the training of the Transformer model to prevent overfitting?",
+      "ground_truth": "The authors implemented two main types of regularization: 1. Residual Dropout: Applied to the output of each sub-layer before it is added to the sub-layer input and normalized, as well as to the sums of the embeddings and positional encodings (with a rate of P_drop = 0.1). 2. Label Smoothing: During training, a label smoothing value of epsilon_ls = 0.1 was employed, which improves overall accuracy and BLEU score by making the model less overconfident."
+    },
+    {
+      "id": 10,
+      "type": "abstract-architectural",
+      "question": "How do the authors justify dispensing with Recurrent Neural Networks (RNNs) in favor of the self-attention mechanism regarding parallelization?",
+      "ground_truth": "Sequential models like LSTMs and GRUs inherently maintain a hidden state that forces computation to progress linearly step-by-step along the time dimension of the sequence, preventing parallelization within training batches. Self-attention bypasses this by calculating alignment weights across all token coordinates simultaneously, allowing for maximum parallelization and drastically reducing total training time."
+    }
+]
