@@ -1,5 +1,5 @@
-from rag.models import PipelineConfig,PipelinePresets
-from pipeline import run_pipeline
+from src.rag.models import PipelineConfig,PipelinePresets
+from src.rag.pipeline import run_pipeline
 import json
 from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
 from ragas import evaluate

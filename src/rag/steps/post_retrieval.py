@@ -1,8 +1,8 @@
 
-from rag.models import PipelineConfig
+from src.rag.models import PipelineConfig
 from langchain_classic.docstore.document import Document
-from rag.models import RerankerConfig
-from rag.core import get_cross_encoder,get_cohere_rerank
+from src.rag.models import RerankerConfig
+from src.rag.core import get_cross_encoder,get_cohere_rerank
 
 
 async def post_retrieval(config:PipelineConfig,trace:dict,query:str,docs:list[Document])->tuple[list[Document],dict]:

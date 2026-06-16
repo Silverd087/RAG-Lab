@@ -1,5 +1,5 @@
-from rag.models import PipelinePresets
-from pipeline import run_pipeline
+from src.rag.models import PipelinePresets
+from src.rag.pipeline import run_pipeline
 
 async def test_baseline():
     config = PipelinePresets.baseline(name="test")

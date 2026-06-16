@@ -1,15 +1,14 @@
 from langchain_community.document_loaders import PyPDFLoader
 from qdrant_client.http.models import Distance, VectorParams,SparseVectorParams
-from rag.core import get_client
-from rag.models import PipelineConfig,ModeConfig
-from rag.core import get_vectorstore, get_splitter,get_parent_doc_retriever
+from src.rag.core import get_client
+from src.rag.models import PipelineConfig,ModeConfig
+from src.rag.core import get_vectorstore, get_splitter,get_parent_doc_retriever
 
 def ensure_collection(config:PipelineConfig):
     client = get_client()
     if not client.collection_exists(f"collection_{config.id}"):
         if config.retrieval.mode == ModeConfig.HYBRID:
             client.create_collection(f"collection_{config.id}",vectors_config=VectorParams(size=3072,distance=Distance.COSINE),sparse_vectors_config={"langchain-sparse":SparseVectorParams()})
-
         else:
             client.create_collection(f"collection_{config.id}",vectors_config=VectorParams(size=3072,distance=Distance.COSINE))
 

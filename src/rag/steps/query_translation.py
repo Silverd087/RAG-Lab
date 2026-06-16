@@ -1,7 +1,7 @@
 
-from rag.models import PipelineConfig
+from src.rag.models import PipelineConfig
 from langchain_core.prompts import ChatPromptTemplate
-from rag.core import get_llm
+from src.rag.core import get_llm
 from langchain_core.output_parsers import StrOutputParser
 import re
 

@@ -1,6 +1,6 @@
 from langchain_classic.docstore.document import Document
-from rag.models import PipelineConfig
-from rag.core import get_llm,get_prompt
+from src.rag.models import PipelineConfig
+from src.rag.core import get_llm,get_prompt
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 

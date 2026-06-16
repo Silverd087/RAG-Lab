@@ -1,9 +1,9 @@
-from rag.models import PipelineConfig,ChunkTrace,PipelineResult
+from src.rag.models import PipelineConfig,ChunkTrace,PipelineResult
 import time
-from rag.steps.query_translation import translate_query
-from rag.steps.retrieval import retrieve
-from rag.steps.post_retrieval import post_retrieval
-from rag.steps.generation import generate
+from src.rag.steps.query_translation import translate_query
+from src.rag.steps.retrieval import retrieve
+from src.rag.steps.post_retrieval import post_retrieval
+from src.rag.steps.generation import generate
 async def run_pipeline(config:PipelineConfig,query:str)->tuple[PipelineResult,str]:
     full_trace = {}
     latency = {}
@@ -38,7 +38,7 @@ async def run_pipeline(config:PipelineConfig,query:str)->tuple[PipelineResult,st
     print("hypothetical_doc:", full_trace.get("hypothetical_doc"))
     pipeline_result = PipelineResult(
         pipeline_id=config.id,
-        translated_query=full_trace.get("hypothetical_doc") or full_trace.get("step_back_query"),
+        translated_query=full_trace.get("hypothetical_doc") or full_trace.get("step_back_query") or "\n".join(full_trace.get("query_variants")),
         chunks=[ChunkTrace(
             content=c.get("content"),
             source=c.get("source"),
