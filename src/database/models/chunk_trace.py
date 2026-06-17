@@ -9,7 +9,7 @@ class ChunkTrace(Base):
     __tablename__ = "chunk_traces"
     id:Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     content:Mapped[str] = mapped_column(Text,nullable=False)
-    source:Mapped[str] = mapped_column(Text,nullable=False)
+    source:Mapped[str|None ] = mapped_column(Text,nullable=True)
     raw_score:Mapped[float] = mapped_column(Float,nullable=False)
     rerank_score:Mapped[float] = mapped_column(Float,nullable=True)
     pipeline_result_id:Mapped[uuid.UUID] = mapped_column(

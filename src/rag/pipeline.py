@@ -38,7 +38,9 @@ async def run_pipeline(config:PipelineConfig,query:str)->tuple[PipelineResult,st
     print("hypothetical_doc:", full_trace.get("hypothetical_doc"))
     pipeline_result = PipelineResult(
         pipeline_id=config.id,
-        translated_query=full_trace.get("hypothetical_doc") or full_trace.get("step_back_query") or "\n".join(full_trace.get("query_variants")),
+        query=query,
+        translated_query=full_trace.get("hypothetical_doc") or full_trace.get("step_back_query"),
+        query_variants= full_trace.get("query_variants") or None,
         chunks=[ChunkTrace(
             content=c.get("content"),
             source=c.get("source"),

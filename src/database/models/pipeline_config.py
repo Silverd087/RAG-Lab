@@ -1,19 +1,17 @@
 from models.base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, ForeignKey,DateTime,Index
+from sqlalchemy import Enum as SAEnum
 import uuid
 from sqlalchemy.dialects.postgresql import UUID,JSONB
 from datetime import datetime,timezone
+import enum
 
-class PipelineStatus(Base):
-    """
-        id = draft 
-        id = ingesting 
-        id = ready
-        id = error
-    """
-    __tablename__ = "pipeline_status"
-    id:Mapped[str] = mapped_column(String(50),primary_key=True)
+class PipelineStatusEnum(str, enum.Enum):
+    DRAFT = "draft"
+    INGESTING = "ingesting"
+    READY = "ready"
+    ERROR = "error"
 
 class PipelineConfig(Base):
     __tablename__ = "pipeline_config"
@@ -21,12 +19,10 @@ class PipelineConfig(Base):
     name:Mapped[str] = mapped_column(String(50))
     created_at:Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
     status_id:Mapped[str] = mapped_column(String(50),ForeignKey("pipeline_status.id"),default="draft")
-    status:Mapped["PipelineStatus"] = relationship("PipelineStatus")
+    status:Mapped[PipelineStatusEnum] = mapped_column(SAEnum(PipelineStatusEnum),default=PipelineStatusEnum.DRAFT)
 
     pipeline_config:Mapped[dict] = mapped_column(JSONB,default=dict,nullable=False)
 
     __table_args__ = (
-        # A GIN (Generalized Inverted Index) allows PostgreSQL to index inside your JSON payload.
-        # This makes running raw SQL queries directly against your nested JSON keys incredibly fast.
-        Index("ix_pipeline_config_payload_gin", "config_payload", postgresql_using="gin"),
+        Index("ix_pipeline_config_gin", "pipeline_config", postgresql_using="gin"),
     )

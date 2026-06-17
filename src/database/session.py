@@ -1,16 +1,18 @@
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine,AsyncSession,async_sessionmaker
 from config import settings
-from sqlalchemy.orm import Session,sessionmaker
 
 
-url = f"postgresql+psycopg2://{settings.postgres_user}:{settings.postgres_password}@localhost/RagLab"
-engine = create_engine(url, echo=True)
-sessionlocal = sessionmaker(bind=engine)
+url = f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}@{settings.postgres_host}/{settings.postgres_db}"
+engine = create_async_engine(url, echo=True)
+async_session = async_sessionmaker(bind=engine,expire_on_commit=False)
 
-def get_db():
-    try:
-        db = sessionlocal()
-        yield db
-    finally:
-        db.close()
+async def get_db():
+    async with async_session() as session:
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+
     

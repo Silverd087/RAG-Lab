@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     cohere_api_key:str
     postgres_user:str
     postgres_password:str
+    postgres_host:str
+    postgres_db:str
 
     class Config:
         env_file = ".env"
