@@ -1,6 +1,6 @@
 from models.base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, ForeignKey,DateTime,Index
+from sqlalchemy import String, ForeignKey,DateTime,Index,Text
 from sqlalchemy import Enum as SAEnum
 import uuid
 from sqlalchemy.dialects.postgresql import UUID,JSONB
@@ -13,13 +13,14 @@ class PipelineStatusEnum(str, enum.Enum):
     READY = "ready"
     ERROR = "error"
 
-class PipelineConfig(Base):
+class PipelineModel(Base):
     __tablename__ = "pipeline_config"
     id:Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     name:Mapped[str] = mapped_column(String(50))
     created_at:Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
     status_id:Mapped[str] = mapped_column(String(50),ForeignKey("pipeline_status.id"),default="draft")
     status:Mapped[PipelineStatusEnum] = mapped_column(SAEnum(PipelineStatusEnum),default=PipelineStatusEnum.DRAFT)
+    error:Mapped[str|None] = mapped_column(Text,nullable=True)
 
     pipeline_config:Mapped[dict] = mapped_column(JSONB,default=dict,nullable=False)
 

@@ -3,9 +3,9 @@ from sqlalchemy.orm import Mapped, mapped_column,relationship
 from sqlalchemy import Text,Float,ForeignKey
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
-from models.pipeline_result import PipelineResult
+from models.pipeline_result import PipelineResultModel
 
-class ChunkTrace(Base):
+class ChunkTraceModel(Base):
     __tablename__ = "chunk_traces"
     id:Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     content:Mapped[str] = mapped_column(Text,nullable=False)
@@ -18,7 +18,7 @@ class ChunkTrace(Base):
         index=True,
         nullable=False
     )
-    pipeline_result:Mapped["PipelineResult"] = relationship(
-        "PipelineResult",
+    pipeline_result:Mapped["PipelineResultModel"] = relationship(
+        "PipelineResultModel",
         back_populates="chunks"
     )

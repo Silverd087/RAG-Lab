@@ -8,7 +8,10 @@ class Settings(BaseSettings):
     postgres_password:str
     postgres_host:str
     postgres_db:str
-
+    minio_port:int
+    minio_access_keys:str
+    minio_secret_keys:str
+    minio_bucket_name:str
     class Config:
         env_file = ".env"
 

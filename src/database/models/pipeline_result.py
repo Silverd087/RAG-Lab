@@ -8,7 +8,7 @@ from typing import List, TYPE_CHECKING
 if TYPE_CHECKING:
     from src.database.models.chunk_trace import ChunkTrace
 
-class PipelineResult(Base):
+class PipelineResultModel(Base):
     __tablename__ = "pipeline_results"
     id:Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     pipeline_id:Mapped[uuid.UUID] = mapped_column(

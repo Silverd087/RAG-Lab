@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine,AsyncSession,async_sessionmaker
 from config import settings
-
+from database.models.base import Base
 
 url = f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}@{settings.postgres_host}/{settings.postgres_db}"
 engine = create_async_engine(url, echo=True)
@@ -15,4 +15,7 @@ async def get_db():
             session.rollback()
             raise
 
+async def init_db():
+    async with engine.begin() as conn:
+        conn.run_sync(Base.metadata.create_all)
     

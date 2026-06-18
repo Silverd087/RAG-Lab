@@ -15,7 +15,7 @@ def ensure_collection(config:PipelineConfig):
 
 
 
-def ingest(file : str, config : PipelineConfig) -> None:
+def run_ingest(file : str, config : PipelineConfig) -> None:
     print(f"retrieval mode: {config.retrieval.mode}")
     print(f"collection: collection_{config.id}")
     
