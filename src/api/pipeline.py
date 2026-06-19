@@ -2,13 +2,17 @@ from fastapi import APIRouter, Depends,status,HTTPException,File,UploadFile
 from rag.models import PipelineConfig
 from database.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select,delete,insert
+from sqlalchemy import select,delete
 from database.models.pipeline import PipelineModel,PipelineStatusEnum
+from database.models.pipeline_result import PipelineResultModel
+from database.models.chunk_trace import ChunkTraceModel
 import uuid
 import filetype
 from storage.minio_client import get_minio_client
 from config import settings
 from api.task import ingest_task
+from rag.pipeline import run_pipeline
+import asyncio
 
 router = APIRouter()
 
@@ -30,7 +34,7 @@ async def get_all_pipelines(db:AsyncSession = Depends(get_db))->list[PipelineCon
         name=pipeline_row.name,
         created_at=pipeline_row.created_at,
         status=pipeline_row.status,
-        **pipeline_row.pipeline_config
+        **pipeline_row.config
     ) for pipeline_row in pipeline_rows]
 
 @router.get("/pipelines/{id}",tags=['pipeline'],status_code=status.HTTP_200_OK)
@@ -49,7 +53,7 @@ async def get_pipeline_by_id(id:uuid.UUID,db:AsyncSession = Depends(get_db))->Pi
         name=pipeline_row.name,
         created_at=pipeline_row.created_at,
         status=pipeline_row.status,
-        **pipeline_row.pipeline_config
+        **pipeline_row.config
     )
 
 @router.delete("/pipelines/{id}",tags=['pipeline'],status_code=status.HTTP_200_OK)
@@ -65,7 +69,7 @@ async def get_pipeline_by_id(id:uuid.UUID,db:AsyncSession = Depends(get_db))->Pi
         name=pipeline_row.name,
         created_at=pipeline_row.created_at,
         status=pipeline_row.status,
-        **pipeline_row.pipeline_config  
+        **pipeline_row.config  
     )
 
 
@@ -133,10 +137,146 @@ async def upload(id:uuid.UUID,file:UploadFile,db:AsyncSession = Depends(get_db))
         name=pipeline_row.name,
         created_at=pipeline_row.created_at,
         status=pipeline_row.status,
-        **pipeline_row.pipeline_config  
+        **pipeline_row.config  
     )
     ingest_task.delay(pipeline.model_dump(mode="json"),object_name)
+
+    return {"status":"ingesting"}
+
+@router.post("/pipelines/{id}/query",tags=["pipeline"])
+async def query(query:str,pipeline_id:uuid.UUID,db:AsyncSession = Depends(get_db)):
+    if not query:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Query must not be empty')
+    if not pipeline_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Pipeline id must not be empty')
+
+    stmt = select(PipelineModel).where(PipelineModel.id == pipeline_id)
+    result = await db.execute(stmt)
+
+    pipeline_row = result.scalar_one_or_none()
+
+    if not pipeline_row:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f'Pipeline with id {pipeline_id} not found')
     
+    pipeline_config = PipelineConfig(
+        id=pipeline_row.id,
+        name=pipeline_row.name,
+        created_at=pipeline_row.created_at,
+        status=pipeline_row.status,
+        **pipeline_row.config
+    )
+    pipeline_result,answer = await run_pipeline(pipeline_config,query)
+
+    result = PipelineResultModel(
+        pipeline_id = pipeline_id,
+        query = query,
+        translated_query = pipeline_result.translated_query,
+        query_variants = pipeline_result.query_variants,
+        answer = answer,
+        latency=pipeline_result.latency
+    )
+    for chunk in pipeline_result.get("chunks",[]):
+        result.chunks.append(
+            ChunkTraceModel(
+                content = chunk.content,
+                source = chunk.source,
+                raw_score=chunk.score,
+                rerank_score=chunk.rerank_score 
+            )
+        )
+    db.add(result)
+    return {
+        "answer": result.answer,
+        "result_id": result.id,
+        "latency_metrics": result.latency
+    }
+
+
+
+@router.post("/compare")
+async def compare(query:str,pipeline_id1:uuid.UUID,pipeline_id2:uuid.UUID,db:AsyncSession=Depends(get_db)):
+    if not query:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Query must not be empty')
+    if not pipeline_id1 or not pipeline_id2:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Both pipeline ids must not be empty')
+    
+    stmt = select(PipelineModel).where(PipelineModel.id.in_([pipeline_id1,pipeline_id2]))
+    result = await db.execute(stmt)
+    pipelines = result.scalars().all()
+    if len(pipelines)<2:
+        raise HTTPException(status_code=status.HTTP_404_BAD_REQUEST,detail='One or both targeted pipeline configurations were not found')
+
+    pipeline_map = {p.id: p for p in pipelines}
+    pipe_row1 = pipeline_map.get(pipeline_id1)
+    pipe_row2 = pipeline_map.get(pipeline_id2)
+
+    config1 = PipelineConfig(
+        id=pipe_row1.id, name=pipe_row1.name, created_at=pipe_row1.created_at, status=pipe_row1.status, **pipe_row1.config_payload
+    )
+    config2 = PipelineConfig(
+        id=pipe_row2.id, name=pipe_row2.name, created_at=pipe_row2.created_at, status=pipe_row2.status, **pipe_row2.config_payload
+    )
+
+    task_1 = run_pipeline(config1,query)
+    task_2 = run_pipeline(config2,query)
+
+    results = await asyncio.gather(task_1,task_2)
+    
+    (pipeline_result1,answer1),(pipeline_result2,answer2) = results
+
+    result1 = PipelineResultModel(
+        pipeline_id = pipeline_id1,
+        query = query,
+        translated_query = pipeline_result1.translated_query,
+        query_variants = pipeline_result1.query_variants,
+        answer = answer1,
+        latency=pipeline_result1.latency
+    )
+    for chunk in pipeline_result1.chunks:
+        result1.chunks.append(
+            ChunkTraceModel(
+                content = chunk.content,
+                source = chunk.source,
+                raw_score=chunk.score,
+                rerank_score=chunk.rerank_score 
+            )
+        )
+    
+    result2 = PipelineResultModel(
+        pipeline_id = pipeline_id2,
+        query = query,
+        translated_query = pipeline_result2.translated_query,
+        query_variants = pipeline_result2.query_variants,
+        answer = answer2,
+        latency=pipeline_result2.latency
+    )
+    for chunk in pipeline_result2.chunks:
+        result2.chunks.append(
+            ChunkTraceModel(
+                content = chunk.content,
+                source = chunk.source,
+                raw_score=chunk.score,
+                rerank_score=chunk.rerank_score 
+            )
+        )
+    db.add_all([result1,result2])
+    return {
+        "pipeline1": {
+            "result_id": result1.id,
+            "answer": result1.answer,
+            "latency_metrics": result1.latency
+        },
+        "pipeline2": {
+            "result_id": result2.id,
+            "answer": result2.answer,
+            "latency_metrics": result2.latency
+        }
+    }
+
+
+
+
+
     
 
 

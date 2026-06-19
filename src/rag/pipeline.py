@@ -45,7 +45,7 @@ async def run_pipeline(config:PipelineConfig,query:str)->tuple[PipelineResult,st
             content=c.get("content"),
             source=c.get("source"),
             raw_score=c.get("score"),
-            rerank_score= next((r["rerank_score"] for r in full_trace.get("reranked_chunks",[]) if r["content"] == c["content"]),None)
+            rerank_score= next((r["rerank_score"] for r in full_trace.get("reranked_chunks",[]) if r.get("content") and r.get("content") == c.get("content")),None)
         ) 
     for c in full_trace.get("retrieved_chunks",[])],
     answer=answer,

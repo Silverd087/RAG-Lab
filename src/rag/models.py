@@ -168,7 +168,7 @@ class ChunkTrace(BaseModel):
 class PipelineResult(BaseModel):
     pipeline_id:UUID4
     query:str
-    query_variants:list[str]
+    query_variants:list[str] | None
     translated_query:str|None
     chunks:list[ChunkTrace]
     answer:str
