@@ -23,6 +23,12 @@ _llm: dict[str,ChatGoogleGenerativeAI] = {}
 _prompt:dict[str,any] = {}
 _sparse_embeddings = None
 
+DEFAULT_RAG_TEMPLATE = """You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.
+    Question: {question} 
+    Context: {context} 
+    Answer:
+"""
+
 def get_sparse_embeddings():
     global _sparse_embeddings
     if _sparse_embeddings is None:
@@ -139,11 +145,6 @@ def get_parent_doc_retriever(config):
         )
     return base_retriever
 
-DEFAULT_RAG_TEMPLATE = """You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.
-    Question: {question} 
-    Context: {context} 
-    Answer:
-"""
 
 def get_prompt(config:PipelineConfig)->ChatPromptTemplate:
     key = config.generation.prompt.prompt_id or "default"

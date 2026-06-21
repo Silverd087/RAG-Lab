@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     postgres_password:str
     postgres_host:str
     postgres_db:str
+    postgres_test_db:str
     minio_port:int
     minio_access_keys:str
     minio_secret_keys:str

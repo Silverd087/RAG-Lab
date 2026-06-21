@@ -64,6 +64,8 @@ async def get_pipeline_by_id(id:uuid.UUID,db:AsyncSession = Depends(get_db))->Pi
     pipeline_row = result.scalar_one_or_none()
     if pipeline_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"pipeline with {id} not found")
+    
+    db.delete(pipeline_row)
     return PipelineConfig(
         id=pipeline_row.id,
         name=pipeline_row.name,
