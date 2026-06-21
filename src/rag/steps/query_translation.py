@@ -61,7 +61,7 @@ async def _hyde(query:str,config:PipelineConfig)->str:
     return await chain.ainvoke({"question":query})
 
 
-async def _generate_variants(query:str,config:PipelineConfig,n:int = 4)->str:
+async def _generate_variants(query:str,config:PipelineConfig,n:int = 4)->list[str]:
     llm = get_llm(config)
     chain = (
         MULTI_QUERY_PROMPT

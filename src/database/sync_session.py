@@ -1,6 +1,6 @@
-from sqlalchemy import create_engine,sessionmaker
+from sqlalchemy import create_engine
 from config import settings
-from database.models.base import Base
+from sqlalchemy.orm import sessionmaker
 
 url = f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}@{settings.postgres_host}/{settings.postgres_db}"
 engine = create_engine(url, echo=True)

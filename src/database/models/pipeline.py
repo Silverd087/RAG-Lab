@@ -1,5 +1,5 @@
 from __future__ import annotations
-from models.base import Base
+from src.database.models.base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, ForeignKey,DateTime,Index,Text
 from sqlalchemy import Enum as SAEnum
@@ -27,5 +27,5 @@ class PipelineModel(Base):
 
 
     __table_args__ = (
-        Index("ix_pipeline_config_gin", "pipeline_config", postgresql_using="gin"),
+        Index("ix_config_gin", "config", postgresql_using="gin"),
     )

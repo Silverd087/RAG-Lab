@@ -3,11 +3,11 @@ from qdrant_client import QdrantClient
 from config import settings
 from langchain_qdrant import QdrantVectorStore,RetrievalMode,FastEmbedSparse
 from langchain_text_splitters import RecursiveCharacterTextSplitter, CharacterTextSplitter
-from .models import PipelineConfig
-from .models import ModeConfig
+from src.rag.models import PipelineConfig
+from src.rag.models import ModeConfig
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain_cohere import CohereRerank
-from .models import ChunkingStrategy
+from src.rag.models import ChunkingStrategy
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.retrievers import ParentDocumentRetriever

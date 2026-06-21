@@ -1,4 +1,4 @@
-from rag.models import (
+from src.rag.models import (
     ChunkingConfig,ChunkingStrategy,IndexingConfig,VectorDb,
     PostRetrievalConfig,RerankerConfig,PipelineConfig,
     PipelineStatus,PipelinePresets,ModeConfig)
@@ -62,7 +62,7 @@ class TestPipelineConfig:
     def test_two_configs_have_different_ids(self):
         a = PipelineConfig(name="a")
         b = PipelineConfig(name="b")
-        assert a.id != b-id
+        assert a.id != b.id
 
     def test_default_status_is_draft(self):
         conifg = PipelineConfig(name="test")

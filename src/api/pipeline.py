@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends,status,HTTPException,File,UploadFile
-from rag.models import PipelineConfig
-from database.session import get_db
+from src.rag.models import PipelineConfig
+from src.database.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select,delete
-from database.models.pipeline import PipelineModel,PipelineStatusEnum
-from database.models.pipeline_result import PipelineResultModel
-from database.models.chunk_trace import ChunkTraceModel
+from src.database.models.pipeline import PipelineModel,PipelineStatusEnum
+from src.database.models.pipeline_result import PipelineResultModel
+from src.database.models.chunk_trace import ChunkTraceModel
 import uuid
 import filetype
-from storage.minio_client import get_minio_client
+from src.storage.minio_client import get_minio_client
 from config import settings
-from api.task import ingest_task
-from rag.pipeline import run_pipeline
+from src.api.task import ingest_task
+from src.rag.pipeline import run_pipeline
 import asyncio
 
 router = APIRouter()

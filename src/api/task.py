@@ -1,13 +1,13 @@
 from celery import shared_task,Task
-from rag.models import PipelineConfig
-from storage.minio_client import get_minio_client
+from src.rag.models import PipelineConfig
+from src.storage.minio_client import get_minio_client
 from config import settings
-from rag.ingest import run_ingest
+from src.rag.ingest import run_ingest
 import tempfile
 import os
 from sqlalchemy.orm import Session
-from database.sync_session import get_sync_db
-from database.models.pipeline import PipelineModel
+from src.database.sync_session import get_sync_db
+from src.database.models.pipeline import PipelineModel
 
 
 def update_pipeline_status(db:Session,pipeline_id:str,status:str,error:str=None):

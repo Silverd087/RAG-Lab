@@ -9,6 +9,8 @@ from config import settings
 from src.rag.models import PipelinePresets
 from unittest.mock import MagicMock, AsyncMock
 from langchain_core.documents import Document
+from langchain_core.messages import AIMessage
+from langchain_community.chat_models.fake import FakeMessagesListChatModel
 
 @pytest.fixture(scope="session")
 def get_event_loop():
@@ -66,6 +68,10 @@ def fake_docs():
     ]
 
 @pytest.fixture
+def duplicate_docs(fake_docs):
+    return fake_docs + fake_docs
+
+@pytest.fixture
 def base_config():
     return PipelinePresets.baseline("test-baseline")
 
@@ -96,10 +102,10 @@ def parent_rerank_config():
 
 
 @pytest.fixture
-def get_llm():
-    llm = MagicMock()
-    llm.ainvoke = AsyncMock(
-        return_value=MagicMock(content="This is mocked LLM response")
+def mock_llm():
+    return FakeMessagesListChatModel(
+        responses=[
+            AIMessage(content="This is a mock response.")
+        ]
     )
-    return llm
 
