@@ -33,7 +33,8 @@ def mock_get_vectorstore(mocker,fake_docs):
 def mock_get_parent_doc_retriever(mocker,fake_docs):
     retriever = MagicMock()
     retriever.add_documents.return_value = MagicMock(return_value=None)
-    retriever.ainvoke.return_value = AsyncMock(return_value=fake_docs)
+    retriever.ainvoke = AsyncMock()
+    retriever.ainvoke.return_value = fake_docs
     mocker.patch("src.rag.ingest.get_parent_doc_retriever", return_value=retriever)
     mocker.patch("src.rag.steps.retrieval.get_parent_doc_retriever", return_value=retriever)
 
@@ -51,4 +52,9 @@ def mock_get_prompt(mocker):
     mocker.patch("src.rag.steps.generation.get_prompt", return_value=prompt)
 
 
+@pytest.fixture(autouse=True)
+def mock_cross_encoder(mocker):
+    cross_encoder = MagicMock()
+    cross_encoder.score.return_value = [0.9,0.8,0.7]
+    mocker.patch("src.rag.steps.post_retrieval.get_cross_encoder",return_value=cross_encoder)
 

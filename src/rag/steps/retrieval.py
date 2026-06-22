@@ -10,7 +10,6 @@ async def retrieve(query:str|list,config:PipelineConfig)-> tuple[list,dict]:
     trace = {}
 
     if isinstance(query,list):
-        vectorstore = get_vectorstore(config)
 
         all_docs = await asyncio.gather(
         *[_standard_retrieve(q, config) for q in query]

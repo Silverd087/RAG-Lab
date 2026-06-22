@@ -1,5 +1,12 @@
 from src.rag.steps.query_translation import translate_query,_generate_variants,_hyde,_step_back
 from src.rag.models import PipelineConfig,QueryTranslationConfig
+import pytest
+
+
+pytestmark = pytest.mark.asyncio
+
+
+
 class TestTranslateQuery:
     async def test_no_translation_returns_original(self,base_config):
         query,trace = await translate_query(query="what is attention",config=base_config)

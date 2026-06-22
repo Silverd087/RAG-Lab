@@ -158,6 +158,14 @@ class PipelinePresets:
         return PipelineConfig(name=name,
                               query_translation=QueryTranslationConfig(step_back=True))
     
+    @staticmethod
+    def rag_cross_encoder(name:str):
+        "Cross Encoder reranker"
+        return PipelineConfig(name=name,post_retrieval=PostRetrievalConfig(reranker=RerankerConfig.CROSS_ENCODER,top_n=2))
+    
+    @staticmethod
+    def rag_reorder(name:str):
+        return PipelineConfig(name=name,post_retrieval=PostRetrievalConfig(reorder=True))
 
 class ChunkTrace(BaseModel):
     content:str

@@ -51,7 +51,7 @@ async def client(db_session:AsyncSession):
     app.dependency_overrides.clear()
 
 @pytest.fixture
-def fake_docs():
+def fake_docs()->list[Document]:
     return [
         Document(
             page_content="Attention is a mechanism that relates positions.",
@@ -68,7 +68,7 @@ def fake_docs():
     ]
 
 @pytest.fixture
-def duplicate_docs(fake_docs):
+def duplicate_docs(fake_docs)->list[Document]:
     return fake_docs + fake_docs
 
 @pytest.fixture
@@ -100,6 +100,17 @@ def rag_fusion_config():
 def parent_rerank_config():
     return PipelinePresets.parent_rerank("test-parent-rerank")
 
+@pytest.fixture
+def cross_encoder_config():
+    return PipelinePresets.rag_cross_encoder("test-cross-encoder")
+
+@pytest.fixture
+def fusion_config():
+    return PipelinePresets.rag_fusion("test-fusion")
+
+@pytest.fixture
+def reorder_config():
+    return PipelinePresets.rag_reorder("test-reorder")
 
 @pytest.fixture
 def mock_llm():
