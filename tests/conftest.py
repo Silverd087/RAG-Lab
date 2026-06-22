@@ -54,15 +54,15 @@ async def client(db_session:AsyncSession):
 def fake_docs()->list[Document]:
     return [
         Document(
-            page_content="Attention is a mechanism that relates positions.",
+            page_content="Chunk 1",
             metadata={"source": "test.pdf", "page": 0, "score": 0.95}
         ),
         Document(
-            page_content="Self-attention computes representations of sequences.",
+            page_content="Chunk 2",
             metadata={"source": "test.pdf", "page": 1, "score": 0.88}
         ),
         Document(
-            page_content="Multi-head attention runs attention in parallel.",
+            page_content="Chunk 3",
             metadata={"source": "test.pdf", "page": 2, "score": 0.81}
         ),
     ]
