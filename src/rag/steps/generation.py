@@ -4,7 +4,7 @@ from src.rag.core import get_llm,get_prompt
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
-def format_docs(docs)->str:
+def format_docs(docs:list[Document])->str:
     return "\n\n".join(doc.page_content for doc in docs)
 
 async def generate(query:str,docs:list[Document],config:PipelineConfig)->tuple[str,]:

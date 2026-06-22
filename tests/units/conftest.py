@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock
+from langchain_core.prompts import ChatPromptTemplate
 
 @pytest.fixture(autouse=True)
 def mock_get_llm(mocker,mock_llm):
@@ -48,7 +49,7 @@ def mock_get_splitter(mocker):
 
 @pytest.fixture(autouse=True)
 def mock_get_prompt(mocker):
-    prompt = MagicMock()
+    prompt = ChatPromptTemplate.from_template("Context: {context}\nQuestion: {question}")
     mocker.patch("src.rag.steps.generation.get_prompt", return_value=prompt)
 
 
