@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from src.api.pipeline import router
+from api.routers.pipeline import router
 
 app = FastAPI()
 

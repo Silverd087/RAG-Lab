@@ -174,6 +174,7 @@ class ChunkTrace(BaseModel):
     rerank_score:float|None
 
 class PipelineResult(BaseModel):
+    id:UUID4|None
     pipeline_id:UUID4
     query:str
     query_variants:list[str] | None
@@ -183,4 +184,11 @@ class PipelineResult(BaseModel):
     latency: dict[str,int]
 
 
+class CompareResponse:
+    pipeline_a:PipelineResult
+    pipeline_b:PipelineResult
+
+class UploadResponse:
+    status:PipelineStatus = PipelineStatus.INGESTING
+    job_id:str
 
