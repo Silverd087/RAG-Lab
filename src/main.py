@@ -1,9 +1,22 @@
 from fastapi import FastAPI
-from api.routers.pipeline import router
+from contextlib import asynccontextmanager
+from src.api.routers import pipeline, documents, query, compare
+from src.database.session import init_db
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
 
-app.include_router(router)
+app = FastAPI(title="RAG Lab", lifespan=lifespan)
+
+PREFIX = "/api/v1"
+
+app.include_router(pipeline.router, prefix=PREFIX)
+app.include_router(documents.router, prefix=PREFIX)
+app.include_router(query.router, prefix=PREFIX)
+app.include_router(compare.router, prefix=PREFIX)
+
 
 def main():
     import uvicorn

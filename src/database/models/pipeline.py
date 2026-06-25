@@ -7,6 +7,10 @@ import uuid
 from sqlalchemy.dialects.postgresql import UUID,JSONB
 from datetime import datetime,timezone
 import enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.database.models.chunk_trace import PipelineResultModel
 
 class PipelineStatusEnum(str, enum.Enum):
     DRAFT = "draft"
@@ -23,7 +27,7 @@ class PipelineModel(Base):
     error:Mapped[str|None] = mapped_column(Text,nullable=True)
 
     config:Mapped[dict] = mapped_column(JSONB,default=dict,nullable=False)
-    pipeline: Mapped["PipelineModel"] = relationship("PipelineModel", back_populates="results")
+    results: Mapped[list["PipelineResultModel"]] = relationship("PipelineResultModel", back_populates="pipeline")
 
 
     __table_args__ = (

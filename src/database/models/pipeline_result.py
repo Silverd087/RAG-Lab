@@ -8,6 +8,7 @@ from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.database.models.chunk_trace import ChunkTraceModel
+    from src.database.models.pipeline import PipelineModel
 
 class PipelineResultModel(Base):
     __tablename__ = "pipeline_results"
@@ -33,4 +34,8 @@ class PipelineResultModel(Base):
         cascade="all,delete-orphan"
     )
 
+    pipeline: Mapped["PipelineModel"] = relationship(
+    "PipelineModel", 
+    back_populates="results" 
+)
 

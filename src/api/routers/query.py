@@ -10,10 +10,10 @@ from src.database.models.chunk_trace import ChunkTraceModel
 import uuid
 from src.rag.pipeline import run_pipeline
 
-router = APIRouter
+router = APIRouter()
 
 @router.post("/pipelines/{id}/query",tags=["query"],response_model=PipelineResult)
-async def query(query:str,id:uuid.UUID,db:AsyncSession = Depends(get_db)):
+async def query_pipeline(id:uuid.UUID,query:str,db:AsyncSession = Depends(get_db)):
     if not query:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Query must not be empty')
     if not id:
@@ -46,17 +46,15 @@ async def query(query:str,id:uuid.UUID,db:AsyncSession = Depends(get_db)):
         translated_query = pipeline_result.translated_query,
         query_variants = pipeline_result.query_variants,
         answer = answer,
-        latency=pipeline_result.latency
+        latency=pipeline_result.latency,
+        chunks= [ChunkTraceModel(
+            content = chunk.content,
+            source = chunk.source,
+            raw_score=chunk.raw_score,
+            rerank_score=chunk.rerank_score 
+        ) for chunk in pipeline_result.chunks]
     )
-    for chunk in pipeline_result.chunks:
-        result.chunks.append(
-            ChunkTraceModel(
-                content = chunk.content,
-                source = chunk.source,
-                raw_score=chunk.raw_score,
-                rerank_score=chunk.rerank_score 
-            )
-        )
+
     db.add(result)
     return  PipelineResult(
         pipeline_id = id,

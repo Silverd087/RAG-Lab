@@ -86,16 +86,16 @@ class PostRetrievalConfig(BaseModel):
 
 class Prompt(BaseModel):
     prompt_id:UUID4 = Field(default_factory=uuid4)
-    prompt:str = None
+    prompt:Optional[str] = None
 
 class GenerationConfig(BaseModel):
     llm: str = "gemini-2.5-flash"
     streaming: bool = False
-    prompt: Optional[Prompt] = Field(default_factory=Prompt)
+    prompt: Optional[Prompt] = None
 
 class PipelineConfig(BaseModel):
     id: UUID4 = Field(default_factory=uuid4)
-    name: str
+    name: str = Field(min_length=1,str_strip=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: PipelineStatus = PipelineStatus.DRAFT
     chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
@@ -184,11 +184,18 @@ class PipelineResult(BaseModel):
     latency: dict[str,int]
 
 
-class CompareResponse:
+class CompareResponse(BaseModel):
     pipeline_a:PipelineResult
     pipeline_b:PipelineResult
 
-class UploadResponse:
+class UploadResponse(BaseModel):
     status:PipelineStatus = PipelineStatus.INGESTING
     job_id:str
 
+class PipelineUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1)
+    status: Optional[str] = None
+    chunking: Optional[ChunkingConfig] = None
+    retrieval: Optional[RetrievalConfig] = None
+    query_translation:Optional[QueryTranslationConfig] = None
+    post_retrieval:Optional[PostRetrievalConfig] = None

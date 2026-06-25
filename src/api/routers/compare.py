@@ -55,17 +55,16 @@ async def compare(query:str,pipeline_id1:uuid.UUID,pipeline_id2:uuid.UUID,db:Asy
         translated_query = pipeline_result1.translated_query,
         query_variants = pipeline_result1.query_variants,
         answer = answer1,
-        latency=pipeline_result1.latency
-    )
-    for chunk in pipeline_result1.chunks:
-        result1.chunks.append(
+        latency=pipeline_result1.latency,
+        chunks=[
             ChunkTraceModel(
                 content = chunk.content,
                 source = chunk.source,
-                raw_score=chunk.score,
+                raw_score=chunk.raw_score,
                 rerank_score=chunk.rerank_score 
             )
-        )
+        for chunk in pipeline_result1.chunks]
+    )
     
     result2 = PipelineResultModel(
         pipeline_id = pipeline_id2,
@@ -73,17 +72,16 @@ async def compare(query:str,pipeline_id1:uuid.UUID,pipeline_id2:uuid.UUID,db:Asy
         translated_query = pipeline_result2.translated_query,
         query_variants = pipeline_result2.query_variants,
         answer = answer2,
-        latency=pipeline_result2.latency
-    )
-    for chunk in pipeline_result2.chunks:
-        result2.chunks.append(
+        latency=pipeline_result2.latency,
+        chunks=[
             ChunkTraceModel(
                 content = chunk.content,
                 source = chunk.source,
-                raw_score=chunk.score,
+                raw_score=chunk.raw_score,
                 rerank_score=chunk.rerank_score 
-            )
-        )
+            )         
+        for chunk in pipeline_result2.chunks]
+    )
     db.add_all([result1,result2])
     result1 = PipelineResult(
         pipeline_id = pipeline_id1,
@@ -91,32 +89,30 @@ async def compare(query:str,pipeline_id1:uuid.UUID,pipeline_id2:uuid.UUID,db:Asy
         translated_query = pipeline_result1.translated_query,
         query_variants = pipeline_result1.query_variants,
         answer = answer1,
-        latency=pipeline_result1.latency
-    )
-    for chunk in pipeline_result1.chunks:
-        result1.chunks.append(
-            ChunkTrace(
+        latency=pipeline_result1.latency,
+        chunks=[
+               ChunkTrace(
                 content = chunk.content,
                 source = chunk.source,
-                raw_score=chunk.score,
+                raw_score=chunk.raw_score,
                 rerank_score=chunk.rerank_score 
             )
-        )
+        for chunk in pipeline_result1.chunks] 
+    )
+
     result2 = PipelineResult(
         pipeline_id = pipeline_id2,
         query = query,
         translated_query = pipeline_result2.translated_query,
         query_variants = pipeline_result2.query_variants,
         answer = answer2,
-        latency=pipeline_result2.latency
-    )
-    for chunk in pipeline_result2.chunks:
-        result2.chunks.append(
-            ChunkTrace(
+        latency=pipeline_result2.latency,
+        chunks= [ChunkTrace(
                 content = chunk.content,
                 source = chunk.source,
-                raw_score=chunk.score,
+                raw_score=chunk.raw_score,
                 rerank_score=chunk.rerank_score 
-            )
-        )
+            ) for chunk in pipeline_result2.chunks]
+    )
+
     return  CompareResponse(result1,result2)

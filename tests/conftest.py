@@ -4,37 +4,57 @@ from src.database.models.base import Base
 import pytest
 from src.main import app  
 from src.database.session import get_db
-from httpx import AsyncClient
+from httpx import AsyncClient,ASGITransport
 from config import settings
 from src.rag.models import PipelinePresets
-from unittest.mock import MagicMock, AsyncMock
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
 from langchain_community.chat_models.fake import FakeMessagesListChatModel
+import pytest_asyncio
+from sqlalchemy.pool import NullPool
+from sqlalchemy import text
+
 
 @pytest.fixture(scope="session")
-def get_event_loop():
+def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")
 async def test_engine():
-    engine = create_async_engine(url=f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}@{settings.postgres_host}/{settings.postgres_test_db}")
+    engine = create_async_engine(url=f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}@{settings.postgres_host}/{settings.postgres_test_db}",poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
-    engine.dispose()
+    await engine.dispose()
 
-@pytest.fixture
-async def db_session(test_engine):
-    async_session = async_sessionmaker(bind=test_engine,class_=AsyncSession, expire_on_commit=False)
+@pytest_asyncio.fixture(scope="session")
+async def session_factory(test_engine):
+    return async_sessionmaker(
+        bind=test_engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )
 
-    async with async_session() as session:
-        yield session
-        await session.rollback()
+@pytest_asyncio.fixture(autouse=True)
+async def clean_db(test_engine):
+    yield
+    async with test_engine.begin() as conn:
+        await conn.execute(text("TRUNCATE chunk_traces, pipeline_results, pipeline_config RESTART IDENTITY CASCADE"))
+
+@pytest_asyncio.fixture
+async def db_session(session_factory):
+    async with session_factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
 
 @pytest.fixture
 async def client(db_session:AsyncSession):
@@ -45,7 +65,7 @@ async def client(db_session:AsyncSession):
             pass
     app.dependency_overrides[get_db] = _override_get_db
     
-    async with AsyncClient(app=app,base_url="http://test") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app),base_url="http://test") as ac:
         yield ac
     
     app.dependency_overrides.clear()
@@ -70,6 +90,7 @@ def fake_docs()->list[Document]:
 @pytest.fixture
 def duplicate_docs(fake_docs)->list[Document]:
     return fake_docs + fake_docs
+
 
 @pytest.fixture
 def base_config():
