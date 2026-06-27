@@ -13,7 +13,9 @@ from langchain_community.chat_models.fake import FakeMessagesListChatModel
 import pytest_asyncio
 from sqlalchemy.pool import NullPool
 from sqlalchemy import text
-
+from langchain_core.prompts import ChatPromptTemplate
+from unittest.mock import MagicMock,AsyncMock
+from src.database.models.pipeline import PipelineModel
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -140,4 +142,180 @@ def mock_llm():
             AIMessage(content="This is a mock response.")
         ]
     )
+
+@pytest.fixture(autouse=True)
+def mock_get_llm(mocker,mock_llm):
+    mocker.patch("src.rag.steps.query_translation.get_llm",return_value=mock_llm)
+    mocker.patch("src.rag.steps.generation.get_llm",return_value=mock_llm)
+
+@pytest.fixture(autouse=True)
+def mock_get_embedding(mocker):
+    embeddings = MagicMock()
+    embeddings.embed_query.return_value = [0.1] * 768
+    mocker.patch("src.rag.core.get_embeddings",return_value=embeddings)
+    mocker.patch("src.rag.steps.retrieval.get_embeddings",return_value=embeddings)
+
+@pytest.fixture(autouse=True)
+def mock_get_client(mocker):
+    client = MagicMock()
+    client.collection_exists.return_value = True
+    mocker.patch("src.rag.ingest.get_client",return_value=client)
+
+@pytest.fixture(autouse=True)
+def mock_get_vectorstore(mocker,fake_docs):
+    vectorstore = MagicMock()
+    vectorstore.similarity_search_with_score.return_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
+    vectorstore.max_marginal_relevance_search_with_score_by_vector.retun_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
+    vectorstore.add_documents.return_value = MagicMock(return_value=None)
+
+    mocker.patch("src.rag.ingest.get_vectorstore",return_value=vectorstore)
+    mocker.patch("src.rag.steps.retrieval.get_vectorstore",return_value=vectorstore)
+
+@pytest.fixture(autouse=True)
+def mock_get_parent_doc_retriever(mocker,fake_docs):
+    retriever = MagicMock()
+    retriever.add_documents.return_value = MagicMock(return_value=None)
+    retriever.ainvoke = AsyncMock()
+    retriever.ainvoke.return_value = fake_docs
+    mocker.patch("src.rag.ingest.get_parent_doc_retriever", return_value=retriever)
+    mocker.patch("src.rag.steps.retrieval.get_parent_doc_retriever", return_value=retriever)
+
+
+@pytest.fixture(autouse=True)
+def mock_get_splitter(mocker):
+    splitter = MagicMock()
+    splitter.split_documents.return_value = []
+    mocker.patch("src.rag.ingest.get_splitter", return_value=splitter)
+    mocker.patch("src.rag.core.get_splitter", return_value=splitter)
+
+@pytest.fixture(autouse=True)
+def mock_get_prompt(mocker):
+    prompt = ChatPromptTemplate.from_template("Context: {context}\nQuestion: {question}")
+    mocker.patch("src.rag.steps.generation.get_prompt", return_value=prompt)
+
+
+@pytest.fixture(autouse=True)
+def mock_cross_encoder(mocker):
+    cross_encoder = MagicMock()
+    cross_encoder.score.return_value = [0.9,0.8,0.7]
+    mocker.patch("src.rag.steps.post_retrieval.get_cross_encoder",return_value=cross_encoder)
+
+@pytest_asyncio.fixture
+async def pipeline(db_session):
+    pipeline_config = PipelinePresets.baseline("test-baseline")
+    pipeline_model =  PipelineModel(
+        id=pipeline_config.id,
+        name=pipeline_config.name,
+        config=pipeline_config.model_dump(exclude={"id","status","created_at","name"})
+        )
+    db_session.add(pipeline_model)
+    await db_session.commit()
+    return {
+        "id": str(pipeline_model.id),
+        "name": pipeline_model.name,
+        "status": pipeline_model.status,
+        "created_at": pipeline_model.created_at.isoformat(),
+        "config": pipeline_model.config,
+    }
+
+@pytest_asyncio.fixture
+async def ready_pipeline(db_session):
+    pipeline_config = PipelinePresets.baseline("test-baseline")
+    pipeline_model =  PipelineModel(
+        id=pipeline_config.id,
+        name=pipeline_config.name,
+        status="ready",
+        config=pipeline_config.model_dump(exclude={"id","status","created_at","name"})
+        )
+    db_session.add(pipeline_model)
+    await db_session.commit()
+    return {
+        "id": str(pipeline_model.id),
+        "name": pipeline_model.name,
+        "status": pipeline_model.status,
+        "created_at": pipeline_model.created_at.isoformat(),
+        "config": pipeline_model.config,
+    }
+
+@pytest.fixture(autouse=True)
+def mock_minio_client(mocker):
+    minio_client = MagicMock()
+    minio_client.put_object = AsyncMock()
+    minio_client.put_object.return_value = True
+
+    mocker.patch("src.api.routers.documents.get_minio_client",return_value=minio_client)
+
+    return minio_client
+
+@pytest.fixture(autouse=True)
+def mock_celery_task(mocker):
+    task_result = MagicMock()
+    task_result.id = "mock-celery-job-id-12345"
+    mock_delay = mocker.patch(
+        "src.api.routers.documents.ingest_task.delay",
+        return_value=task_result
+    )
+    return mock_delay 
+
+
+import pytest
+from unittest.mock import MagicMock, AsyncMock
+from langchain_core.prompts import ChatPromptTemplate
+
+@pytest.fixture(autouse=True)
+def mock_get_llm(mocker,mock_llm):
+    mocker.patch("src.rag.steps.query_translation.get_llm",return_value=mock_llm)
+    mocker.patch("src.rag.steps.generation.get_llm",return_value=mock_llm)
+
+@pytest.fixture(autouse=True)
+def mock_get_embedding(mocker):
+    embeddings = MagicMock()
+    embeddings.embed_query.return_value = [0.1] * 768
+    mocker.patch("src.rag.core.get_embeddings",return_value=embeddings)
+    mocker.patch("src.rag.steps.retrieval.get_embeddings",return_value=embeddings)
+
+@pytest.fixture(autouse=True)
+def mock_get_client(mocker):
+    client = MagicMock()
+    client.collection_exists.return_value = True
+    mocker.patch("src.rag.ingest.get_client",return_value=client)
+
+@pytest.fixture(autouse=True)
+def mock_get_vectorstore(mocker,fake_docs):
+    vectorstore = MagicMock()
+    vectorstore.similarity_search_with_score.return_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
+    vectorstore.max_marginal_relevance_search_with_score_by_vector.return_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
+    vectorstore.add_documents.return_value = MagicMock(return_value=None)
+
+    mocker.patch("src.rag.ingest.get_vectorstore",return_value=vectorstore)
+    mocker.patch("src.rag.steps.retrieval.get_vectorstore",return_value=vectorstore)
+
+@pytest.fixture(autouse=True)
+def mock_get_parent_doc_retriever(mocker,fake_docs):
+    retriever = MagicMock()
+    retriever.add_documents.return_value = MagicMock(return_value=None)
+    retriever.ainvoke = AsyncMock()
+    retriever.ainvoke.return_value = fake_docs
+    mocker.patch("src.rag.ingest.get_parent_doc_retriever", return_value=retriever)
+    mocker.patch("src.rag.steps.retrieval.get_parent_doc_retriever", return_value=retriever)
+
+
+@pytest.fixture(autouse=True)
+def mock_get_splitter(mocker):
+    splitter = MagicMock()
+    splitter.split_documents.return_value = []
+    mocker.patch("src.rag.ingest.get_splitter", return_value=splitter)
+    mocker.patch("src.rag.core.get_splitter", return_value=splitter)
+
+@pytest.fixture(autouse=True)
+def mock_get_prompt(mocker):
+    prompt = ChatPromptTemplate.from_template("Context: {context}\nQuestion: {question}")
+    mocker.patch("src.rag.steps.generation.get_prompt", return_value=prompt)
+
+
+@pytest.fixture(autouse=True)
+def mock_cross_encoder(mocker):
+    cross_encoder = MagicMock()
+    cross_encoder.score.return_value = [0.9,0.8,0.7]
+    mocker.patch("src.rag.steps.post_retrieval.get_cross_encoder",return_value=cross_encoder)
 

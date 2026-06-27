@@ -34,8 +34,6 @@ async def run_pipeline(config:PipelineConfig,query:str)->tuple[PipelineResult,st
     latency["generation_ms"] = int((time.time() - t0)*1000)
     full_trace.update(generation_trace)
     
-    print("full_trace keys:", full_trace.keys())
-    print("hypothetical_doc:", full_trace.get("hypothetical_doc"))
     pipeline_result = PipelineResult(
         pipeline_id=config.id,
         query=query,

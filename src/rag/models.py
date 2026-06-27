@@ -1,8 +1,9 @@
-from pydantic import BaseModel,UUID4, model_validator,Field
+from pydantic import BaseModel,UUID4, model_validator,Field,ConfigDict
 from enum import Enum
 from datetime import datetime,timezone
 from typing import Optional
 from uuid import uuid4
+
 
 class PipelineStatus(str,Enum):
     DRAFT = "draft"
@@ -94,8 +95,9 @@ class GenerationConfig(BaseModel):
     prompt: Optional[Prompt] = None
 
 class PipelineConfig(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
     id: UUID4 = Field(default_factory=uuid4)
-    name: str = Field(min_length=1,str_strip=True)
+    name: str = Field(min_length=1)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: PipelineStatus = PipelineStatus.DRAFT
     chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
@@ -174,7 +176,7 @@ class ChunkTrace(BaseModel):
     rerank_score:float|None
 
 class PipelineResult(BaseModel):
-    id:UUID4|None
+    id:UUID4|None = Field(default_factory=uuid4)
     pipeline_id:UUID4
     query:str
     query_variants:list[str] | None
@@ -199,3 +201,7 @@ class PipelineUpdate(BaseModel):
     retrieval: Optional[RetrievalConfig] = None
     query_translation:Optional[QueryTranslationConfig] = None
     post_retrieval:Optional[PostRetrievalConfig] = None
+
+class QueryRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    query:str = Field(...,min_length=1,str_strip=True)

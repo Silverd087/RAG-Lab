@@ -4,7 +4,7 @@ from config import settings
 from src.api.task import ingest_task
 from src.database.session import get_db
 from fastapi import APIRouter, Depends,status,HTTPException,UploadFile
-from src.database.models.pipeline import PipelineModel,PipelineStatusEnum
+from src.database.models.pipeline import PipelineModel
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.rag.models import PipelineConfig
@@ -18,12 +18,14 @@ ALLOWED_MIME_TYPES = {
 
 router = APIRouter()
 
-@router.post("/pipelines/{id}/upload",tags=["documents"],status_code=status.HTTP_202_ACCEPTED,response_model=PipelineStatusEnum)
+@router.post("/pipelines/{id}/upload",tags=["documents"],status_code=status.HTTP_202_ACCEPTED,response_model=UploadResponse)
 async def upload(id:uuid.UUID,file:UploadFile,db:AsyncSession = Depends(get_db)):
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Missing file name')
     if not any(file.filename.endswith(ext) for ext in ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Bad file extension')
+    if file.size is not None and file.size == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Cannot upload an empty file')
     
     header_bytes = await file.read(2048)
     await file.seek(0)
@@ -39,10 +41,10 @@ async def upload(id:uuid.UUID,file:UploadFile,db:AsyncSession = Depends(get_db))
     pipeline_row = result.scalar_one_or_none()
 
     if not pipeline_row:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f'Pipeline with id {id} not found')
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f'Pipeline with id {id} not found')
     object_name = f"pipelines/{id}/{file.filename.lower()}"
     minio_client = get_minio_client()
-    minio_client.put_object(
+    await minio_client.put_object(
                             bucket_name=settings.minio_bucket_name,
                             data=file.file,
                             object_name=object_name,
