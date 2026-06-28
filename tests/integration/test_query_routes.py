@@ -53,7 +53,8 @@ class TestQueryPipeline:
         response = await client.post(f"/api/v1/pipelines/{ready_pipeline["id"]}/query",json={"query":"what is attention"})
         assert response.status_code == 200
         data = response.json()
-        stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == ready_pipeline["id"])
+        print(data)
+        stmt = select(PipelineResultModel).where(PipelineResultModel.id == data["id"])
         result = await db_session.execute(stmt)
         pipeline_row = result.scalar_one_or_none()
         assert pipeline_row is not None
@@ -72,3 +73,46 @@ class TestQueryPipeline:
         assert isinstance(data["chunks"],list)
         for chunk in data["chunks"]:
             assert ChunkTrace.model_validate(chunk)
+
+    
+    async def test_query_with_hyde_returns_translated_query(self,client,ready_hyde_pipeline):
+        response = await client.post(f"/api/v1/pipelines/{ready_hyde_pipeline["id"]}/query",json={"query":"what is attention"})
+        data = response.json()
+        print(data)
+        assert "translated_query" in data
+        assert isinstance(data["translated_query"],str)
+    async def test_query_with_multiquery_returns_query_variants(self,client,ready_multiquery_pipeline):
+        response = await client.post(f"/api/v1/pipelines/{ready_multiquery_pipeline["id"]}/query",json={"query":"what is attention"})
+        data = response.json()
+        assert "query_variants" in data
+        assert isinstance(data["query_variants"],list)
+
+
+class TestQueryHistory:
+    async def test_get_query_history_returns_200(self,client,ready_pipeline):
+        response = await client.post(f"/api/v1/pipelines/{ready_pipeline["id"]}/query",json={"query":"what is attention"})
+        assert response.status_code == 200
+
+        response = await client.get(f"/api/v1/pipelines/{ready_pipeline["id"]}/results")
+        assert response.status_code == 200
+
+    async def test_get_query_history_returns_all_queries(self,client,ready_pipeline):
+        response = await client.post(f"/api/v1/pipelines/{ready_pipeline["id"]}/query",json={"query":"what is attention"})
+        assert response.status_code == 200
+
+        response = await client.get(f"/api/v1/pipelines/{ready_pipeline["id"]}/results")
+        data = response.json()
+        assert all("query" in data[i] for i in range(len(data)))
+        assert all(isinstance(data[i]["query"],str) for i in range(len(data)))
+
+    async def test_get_query_history_nonexistent_pipeline_returns_404(self,client):
+        id = uuid.uuid4()
+        response = await client.get(f"/api/v1/pipelines/{id}/results")
+        assert response.status_code == 404
+
+    async def test_get_query_history_empty_when_no_queries_returns_404(self,client,ready_pipeline):
+        response = await client.get(f"/api/v1/pipelines/{ready_pipeline["id"]}/results")
+        assert response.status_code == 404
+
+
+

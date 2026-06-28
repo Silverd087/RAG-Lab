@@ -1,19 +1,22 @@
 from fastapi import APIRouter, Depends,status,HTTPException
-from src.rag.models import PipelineConfig,CompareResponse,PipelineResult,ChunkTrace
+from src.rag.models import PipelineConfig,CompareResponse,PipelineResult,ChunkTrace,CompareRequest
 from src.database.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from src.database.models.pipeline import PipelineModel,PipelineStatusEnum
 from src.database.models.pipeline_result import PipelineResultModel
 from src.database.models.chunk_trace import ChunkTraceModel
-import uuid
 from src.rag.pipeline import run_pipeline
 import asyncio
+from src.api.task import run_deep_eval
 
 router = APIRouter()
 
 @router.post("/compare",tags=["compare"],response_model=CompareResponse)
-async def compare(query:str,pipeline_id1:uuid.UUID,pipeline_id2:uuid.UUID,db:AsyncSession=Depends(get_db)):
+async def compare(payload:CompareRequest,db:AsyncSession=Depends(get_db)):
+    query = payload.query
+    pipeline_id1 = payload.pipeline_id1
+    pipeline_id2 = payload.pipeline_id2
     if not query:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Query must not be empty')
     if not pipeline_id1 or not pipeline_id2:
@@ -83,36 +86,11 @@ async def compare(query:str,pipeline_id1:uuid.UUID,pipeline_id2:uuid.UUID,db:Asy
         for chunk in pipeline_result2.chunks]
     )
     db.add_all([result1,result2])
-    result1 = PipelineResult(
-        pipeline_id = pipeline_id1,
-        query = query,
-        translated_query = pipeline_result1.translated_query,
-        query_variants = pipeline_result1.query_variants,
-        answer = answer1,
-        latency=pipeline_result1.latency,
-        chunks=[
-               ChunkTrace(
-                content = chunk.content,
-                source = chunk.source,
-                raw_score=chunk.raw_score,
-                rerank_score=chunk.rerank_score 
-            )
-        for chunk in pipeline_result1.chunks] 
-    )
+    await db.flush()
 
-    result2 = PipelineResult(
-        pipeline_id = pipeline_id2,
-        query = query,
-        translated_query = pipeline_result2.translated_query,
-        query_variants = pipeline_result2.query_variants,
-        answer = answer2,
-        latency=pipeline_result2.latency,
-        chunks= [ChunkTrace(
-                content = chunk.content,
-                source = chunk.source,
-                raw_score=chunk.raw_score,
-                rerank_score=chunk.rerank_score 
-            ) for chunk in pipeline_result2.chunks]
-    )
+    job = run_deep_eval.delay(result_id1=result1.id,result_id2=result2.id,config_1_dict=config1.model_dump(mode='json'),config_2_dict=config2.model_dump(mode='json'))
 
-    return  CompareResponse(result1,result2)
+    pipeline_result1.id = result1.id
+    pipeline_result2.id = result2.id
+
+    return  CompareResponse(job_id=job.id,result1=pipeline_result1,result2=pipeline_result2)

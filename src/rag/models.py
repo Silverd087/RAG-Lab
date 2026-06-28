@@ -187,8 +187,9 @@ class PipelineResult(BaseModel):
 
 
 class CompareResponse(BaseModel):
-    pipeline_a:PipelineResult
-    pipeline_b:PipelineResult
+    job_id:str
+    result1:PipelineResult
+    result2:PipelineResult
 
 class UploadResponse(BaseModel):
     status:PipelineStatus = PipelineStatus.INGESTING
@@ -204,4 +205,23 @@ class PipelineUpdate(BaseModel):
 
 class QueryRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-    query:str = Field(...,min_length=1,str_strip=True)
+    query:str = Field(...,min_length=1)
+
+class CompareRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    pipeline_id1:UUID4
+    pipeline_id2:UUID4
+    query:str = Field(...,min_length=1)
+
+class DeepEvalScores(BaseModel):
+    faithulness: float
+    context_recall:float
+    context_precision:float
+    answer_relevance: float
+
+class JobStatusResponse(BaseModel):
+    job_id:str
+    status:str
+    scores_1: Optional[DeepEvalScores] = None
+    scores_2: Optional[DeepEvalScores] = None
+    error: Optional[str] = None    

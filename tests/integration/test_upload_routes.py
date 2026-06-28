@@ -23,7 +23,7 @@ class TestUploadDocument:
         response = await client.post(f"/api/v1/pipelines/{pipeline["id"]}/upload",
                                     files={"file": ("test.pdf", b"%PDF-1.4", "application/pdf")})
         
-        mock_celery_task.assert_called_once()
+        mock_celery_task["documents"].assert_called_once()
 
     async def test_upload_non_pdf_returns_400(self,client,pipeline):
         response = await client.post(f"/api/v1/pipelines/{pipeline["id"]}/upload",

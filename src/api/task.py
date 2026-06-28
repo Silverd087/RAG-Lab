@@ -8,7 +8,15 @@ import os
 from sqlalchemy.orm import Session
 from src.database.sync_session import get_sync_db
 from src.database.models.pipeline import PipelineModel
-
+from src.database.models.pipeline_result import PipelineResultModel
+from fastapi import Depends
+from sqlalchemy import select
+from deepeval.metrics import FaithfulnessMetric, AnswerRelevancyMetric, ContextualPrecisionMetric, ContextualRecallMetric
+from deepeval.test_case import LLMTestCase
+from deepeval.dataset import EvaluationDataset
+from deepeval import evaluate
+from src.rag.core import get_llm
+from sqlalchemy.orm import joinedload
 
 def update_pipeline_status(db:Session,pipeline_id:str,status:str,error:str=None):
     pipeline = db.query(PipelineModel).filter(PipelineModel.id == pipeline_id).first()
@@ -51,3 +59,65 @@ def ingest_task(config_dict:dict,object_name:str,)->None:
             response.release_conn()
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
+
+
+@shared_task
+def run_deep_eval(result_id1:str,result_id2:str,config_1_dict:dict,config_2_dict:dict,db:Session=get_sync_db()):
+
+    stmt = (
+        select(PipelineResultModel)
+        .options(joinedload(PipelineResultModel.chunks))
+        .where(PipelineResultModel.id == result_id1)
+    )    
+    result = db.execute(stmt)
+    pipeline_result1 = result.scalar_one_or_none()
+
+
+    stmt = (
+        select(PipelineResultModel)
+        .options(joinedload(PipelineResultModel.chunks))
+        .where(PipelineResultModel.id == result_id2)
+    )  
+    result = db.execute(stmt)
+    pipeline_result2 = result.scalar_one_or_none()
+
+    pipeline_results = [pipeline_result1,pipeline_result2]
+
+    test_cases = []
+
+    for p in pipeline_results:
+        test_case = LLMTestCase(input=p.query,
+                                actual_output=p.answer,
+                                context=[chunk.content for chunk in p.chunks])
+        test_cases.append(test_case)
+
+    dataset = EvaluationDataset(test_cases)
+
+    config1 = PipelineConfig.model_validate(config_1_dict)
+    config2 = PipelineConfig.model_validate(config_2_dict)
+    eval_model = get_llm(config1)
+
+    metrics = [
+        FaithfulnessMetric(threshold=0.7, model=eval_model),
+        AnswerRelevancyMetric(threshold=0.7, model=eval_model),
+        ContextualPrecisionMetric(threshold=0.7, model=eval_model),
+        ContextualRecallMetric(threshold=0.7, model=eval_model)
+    ]
+
+    results = evaluate(test_cases=dataset,metrics=metrics)
+
+    ## to change into a pydantic model
+    return {
+        "scores_a": {
+            "faithfulness": results.test_results[0].metrics_data[0].score,
+            "answer_relevancy": results.test_results[0].metrics_data[1].score,
+            "contextual_precision": results.test_results[0].metrics_data[2].score,
+            "contextual_recall": results.test_results[0].metrics_data[3].score,
+        },
+        "scores_b": {
+            "faithfulness": results.test_results[1].metrics_data[0].score,
+            "answer_relevancy": results.test_results[1].metrics_data[1].score,
+            "contextual_precision": results.test_results[1].metrics_data[2].score,
+            "contextual_recall": results.test_results[1].metrics_data[3].score,
+        }
+    }

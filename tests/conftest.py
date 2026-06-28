@@ -229,6 +229,7 @@ async def ready_pipeline(db_session):
         )
     db_session.add(pipeline_model)
     await db_session.commit()
+
     return {
         "id": str(pipeline_model.id),
         "name": pipeline_model.name,
@@ -236,6 +237,60 @@ async def ready_pipeline(db_session):
         "created_at": pipeline_model.created_at.isoformat(),
         "config": pipeline_model.config,
     }
+
+@pytest_asyncio.fixture
+async def ready_hyde_pipeline(db_session):
+    pipeline_config = PipelinePresets.rag_hyde("test-hyde")
+    pipeline_model =  PipelineModel(
+        id=pipeline_config.id,
+        name=pipeline_config.name,
+        status="ready",
+        config=pipeline_config.model_dump(exclude={"id","status","created_at","name"})
+        )
+    db_session.add(pipeline_model)
+    await db_session.commit()
+    return {
+        "id": str(pipeline_model.id),
+        "name": pipeline_model.name,
+        "status": pipeline_model.status,
+        "created_at": pipeline_model.created_at.isoformat(),
+        "config": pipeline_model.config,
+    }
+
+@pytest_asyncio.fixture
+async def ready_multiquery_pipeline(db_session):
+    pipeline_config = PipelinePresets.rag_multiquery("test-hyde")
+    pipeline_model =  PipelineModel(
+        id=pipeline_config.id,
+        name=pipeline_config.name,
+        status="ready",
+        config=pipeline_config.model_dump(exclude={"id","status","created_at","name"})
+        )
+    db_session.add(pipeline_model)
+    await db_session.commit()
+    return {
+        "id": str(pipeline_model.id),
+        "name": pipeline_model.name,
+        "status": pipeline_model.status,
+        "created_at": pipeline_model.created_at.isoformat(),
+        "config": pipeline_model.config,
+    }
+
+@pytest_asyncio.fixture
+async def two_ready_pipelines(client: AsyncClient) -> tuple[dict, dict]:
+    """Two ready pipelines for compare tests"""
+    r1 = await client.post("/api/v1/pipelines", json={"name": "pipeline-a"})
+    r2 = await client.post("/api/v1/pipelines", json={"name": "pipeline-b"})
+    assert r1.status_code == 201
+    assert r2.status_code == 201
+    
+    p1, p2 = r1.json(), r2.json()
+    
+    await client.patch(f"/api/v1/pipelines/{p1['id']}", json={"status": "ready"})
+    await client.patch(f"/api/v1/pipelines/{p2['id']}", json={"status": "ready"})
+
+    return {**p1, "status": "ready"}, {**p2, "status": "ready"}
+
 
 @pytest.fixture(autouse=True)
 def mock_minio_client(mocker):
@@ -251,16 +306,18 @@ def mock_minio_client(mocker):
 def mock_celery_task(mocker):
     task_result = MagicMock()
     task_result.id = "mock-celery-job-id-12345"
-    mock_delay = mocker.patch(
+    mock_ingest_delay = mocker.patch(
         "src.api.routers.documents.ingest_task.delay",
         return_value=task_result
     )
-    return mock_delay 
-
-
-import pytest
-from unittest.mock import MagicMock, AsyncMock
-from langchain_core.prompts import ChatPromptTemplate
+    mock_eval_delay = mocker.patch(
+        "src.api.routers.compare.run_deep_eval.delay",
+        return_value=task_result
+    )
+    return {
+        "documents":mock_ingest_delay,
+        "eval":mock_eval_delay
+    } 
 
 @pytest.fixture(autouse=True)
 def mock_get_llm(mocker,mock_llm):

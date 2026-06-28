@@ -58,7 +58,9 @@ async def query_pipeline(id:uuid.UUID,payload:QueryRequest,db:AsyncSession = Dep
     )
 
     db.add(result)
-    return pipeline_result
+    await db.flush()
+    updated_result = pipeline_result.model_copy(update={"id": result.id})
+    return updated_result
 
 @router.get("/pipelines/{id}/results",status_code=status.HTTP_200_OK,response_model=list[PipelineResult])
 async def get_pipeline_history(id:uuid.UUID,db:AsyncSession = Depends(get_db)):
