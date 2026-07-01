@@ -9,7 +9,7 @@ from src.database.models.pipeline_result import PipelineResultModel
 from src.database.models.chunk_trace import ChunkTraceModel
 import uuid
 from src.rag.pipeline import run_pipeline
-from src.rag.models import QueryRequest
+from src.api.schema import QueryRequest
 
 router = APIRouter()
 

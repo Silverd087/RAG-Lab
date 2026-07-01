@@ -186,42 +186,4 @@ class PipelineResult(BaseModel):
     latency: dict[str,int]
 
 
-class CompareResponse(BaseModel):
-    job_id:str
-    result1:PipelineResult
-    result2:PipelineResult
-
-class UploadResponse(BaseModel):
-    status:PipelineStatus = PipelineStatus.INGESTING
-    job_id:str
-
-class PipelineUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1)
-    status: Optional[str] = None
-    chunking: Optional[ChunkingConfig] = None
-    retrieval: Optional[RetrievalConfig] = None
-    query_translation:Optional[QueryTranslationConfig] = None
-    post_retrieval:Optional[PostRetrievalConfig] = None
-
-class QueryRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-    query:str = Field(...,min_length=1)
-
-class CompareRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-    pipeline_id1:UUID4
-    pipeline_id2:UUID4
-    query:str = Field(...,min_length=1)
-
-class DeepEvalScores(BaseModel):
-    faithulness: float
-    context_recall:float
-    context_precision:float
-    answer_relevance: float
-
-class JobStatusResponse(BaseModel):
-    job_id:str
-    status:str
-    scores_1: Optional[DeepEvalScores] = None
-    scores_2: Optional[DeepEvalScores] = None
-    error: Optional[str] = None    
+ 

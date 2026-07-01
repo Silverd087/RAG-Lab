@@ -17,6 +17,7 @@ from deepeval.dataset import EvaluationDataset
 from deepeval import evaluate
 from src.rag.core import get_llm
 from sqlalchemy.orm import joinedload
+from src.api.schema import DeepEvalScores,DeepEvalResponse
 
 def update_pipeline_status(db:Session,pipeline_id:str,status:str,error:str=None):
     pipeline = db.query(PipelineModel).filter(PipelineModel.id == pipeline_id).first()
@@ -106,18 +107,19 @@ def run_deep_eval(result_id1:str,result_id2:str,config_1_dict:dict,config_2_dict
 
     results = evaluate(test_cases=dataset,metrics=metrics)
 
-    ## to change into a pydantic model
-    return {
-        "scores_a": {
-            "faithfulness": results.test_results[0].metrics_data[0].score,
-            "answer_relevancy": results.test_results[0].metrics_data[1].score,
-            "contextual_precision": results.test_results[0].metrics_data[2].score,
-            "contextual_recall": results.test_results[0].metrics_data[3].score,
-        },
-        "scores_b": {
-            "faithfulness": results.test_results[1].metrics_data[0].score,
-            "answer_relevancy": results.test_results[1].metrics_data[1].score,
-            "contextual_precision": results.test_results[1].metrics_data[2].score,
-            "contextual_recall": results.test_results[1].metrics_data[3].score,
-        }
-    }
+    return (
+        DeepEvalResponse(
+            scores_1=DeepEvalScores(faithulness=result.test_result[0].metrics_data[0].score,
+                       answer_relevance=results.test_results[0].metrics_data[1].score,
+                       context_precision=results.test_results[0].metrics_data[2].score,
+                       context_recall=results.test_results[0].metrics_data[3].score
+                       ),
+            scores_2=DeepEvalScores(faithulness=result.test_result[1].metrics_data[0].score,
+                        answer_relevance=results.test_results[1].metrics_data[1].score,
+                        context_precision=results.test_results[1].metrics_data[2].score,
+                        context_recall=results.test_results[1].metrics_data[3].score
+                       )
+        )
+
+    )
+

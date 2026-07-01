@@ -8,7 +8,7 @@ from src.database.models.pipeline import PipelineModel
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.rag.models import PipelineConfig
-from src.rag.models import UploadResponse
+from src.api.schema import UploadResponse
 from sqlalchemy import select
 
 ALLOWED_EXTENSIONS = {".pdf"}

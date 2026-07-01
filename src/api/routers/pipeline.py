@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends,status,HTTPException
-from src.rag.models import PipelineConfig,PipelineUpdate
+from src.rag.models import PipelineConfig
 from src.database.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select,update
 from src.database.models.pipeline import PipelineModel,PipelineStatusEnum
 import uuid
-
+from src.api.schema import PipelineUpdate
 router = APIRouter()
 
 

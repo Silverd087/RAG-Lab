@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends,status,HTTPException
-from src.rag.models import PipelineConfig,CompareResponse,PipelineResult,ChunkTrace,CompareRequest
+from src.rag.models import PipelineConfig
 from src.database.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -9,6 +9,7 @@ from src.database.models.chunk_trace import ChunkTraceModel
 from src.rag.pipeline import run_pipeline
 import asyncio
 from src.api.task import run_deep_eval
+from src.api.schema import CompareRequest,CompareResponse
 
 router = APIRouter()
 
