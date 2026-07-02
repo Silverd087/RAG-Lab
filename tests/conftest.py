@@ -45,7 +45,7 @@ async def session_factory(test_engine):
 async def clean_db(test_engine):
     yield
     async with test_engine.begin() as conn:
-        await conn.execute(text("TRUNCATE chunk_traces, pipeline_results, pipeline_config RESTART IDENTITY CASCADE"))
+        await conn.execute(text("TRUNCATE chunk_traces, pipeline_results, pipeline_config, datasets, dataset_items, benchmarks, comparisons RESTART IDENTITY CASCADE"))
 
 @pytest_asyncio.fixture
 async def db_session(session_factory):
@@ -375,4 +375,50 @@ def mock_cross_encoder(mocker):
     cross_encoder = MagicMock()
     cross_encoder.score.return_value = [0.9,0.8,0.7]
     mocker.patch("src.rag.steps.post_retrieval.get_cross_encoder",return_value=cross_encoder)
+
+@pytest_asyncio.fixture
+async def dataset(client):
+    payload = {
+        "name":"test-dataset",
+        "description":"toy dataset for integration tests",
+        "items":[
+            {
+            "question": "What are the specific BLEU scores achieved by the Transformer model on the WMT 2014 English-to-German and English-to-French translation tasks?",
+            "ground_truth": "The Transformer model achieves a BLEU score of 28.4 on the WMT 2014 English-to-German translation task, improving over existing best results and ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, it establishes a new single-model state-of-the-art BLEU score of 41.0."
+            }
+        ]
+    }
+    response = await client.post("/api/v1/datasets",json=payload)
+    data = response.json()
+
+    return data
+
+@pytest_asyncio.fixture
+async def datasets(client):
+    payload_1 = {
+        "name":"test-dataset-1",
+        "description":"toy dataset for integration tests 1",
+        "items":[
+            {
+            "question": "What are the specific BLEU scores achieved by the Transformer model on the WMT 2014 English-to-German and English-to-French translation tasks?",
+            "ground_truth": "The Transformer model achieves a BLEU score of 28.4 on the WMT 2014 English-to-German translation task, improving over existing best results and ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, it establishes a new single-model state-of-the-art BLEU score of 41.0."
+            }
+        ]
+    }
+
+    payload_2 = {
+        "name":"test-dataset-1",
+        "description":"toy dataset for integration tests 1",
+        "items":[
+            {
+            "question": "What is the exact mathematical equation used to calculate Scaled Dot-Product Attention in the paper?",
+            "ground_truth": "The formula for Scaled Dot-Product Attention is computed on a set of queries, keys, and values packed into matrices Q, K, and V: Attention(Q, K, V) = softmax((Q * K^T) / sqrt(d_k)) * V, where d_k represents the dimensionality of the keys."
+            }
+        ]
+    }
+    response_1 = await client.post("/api/v1/datasets",json=payload_1)
+    response_2 = await client.post("/api/v1/datasets",json=payload_2)
+
+    return [response_1.json(),response_2.json()]
+
 

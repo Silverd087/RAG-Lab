@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from src.api.routers import pipeline, documents, query, compare
+from src.api.routers import pipeline, documents, query, compare,dataset,benchmark
 from src.database.session import init_db
 
 @asynccontextmanager
@@ -16,6 +16,9 @@ app.include_router(pipeline.router, prefix=PREFIX)
 app.include_router(documents.router, prefix=PREFIX)
 app.include_router(query.router, prefix=PREFIX)
 app.include_router(compare.router, prefix=PREFIX)
+app.include_router(dataset.router, prefix=PREFIX)
+app.include_router(benchmark.router, prefix=PREFIX)
+
 
 
 def main():

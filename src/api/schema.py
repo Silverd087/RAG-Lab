@@ -51,10 +51,26 @@ class DatasetItemCreate(BaseModel):
     question:str
     ground_truth:str
 
+class DatasetItemCreateQuery(BaseModel):
+    items: list[DatasetItemCreate]
+
+    @field_validator("items")
+    def must_not_be_empty(cls, value):
+        if not value or len(value) == 0:
+            raise ValueError("Items list cannot be empty")
+        return value
+
 class DatasetCreateQuery(BaseModel):
-    name:str
+    model_config = ConfigDict(str_strip_whitespace=True)
+    name:str = Field(...,min_length=1)
     description:str
     items: list[DatasetItemCreate]
+
+    @field_validator("items")
+    def must_not_be_empty(cls, value):
+        if not value or len(value) == 0:
+            raise ValueError("Items list cannot be empty")
+        return value
 
 class DatasetItemResponse(BaseModel):
     id:UUID4
@@ -66,7 +82,7 @@ class DatasetResponse(BaseModel):
     name:str
     description:Optional[str] = None
     created_at:datetime
-    items: list[DatasetItemResponse]
+    items: Optional[list[DatasetItemResponse]] = None
 
 class DatasetListResponse(BaseModel):
     id:UUID4
