@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict,Field,UUID4,field_validator
 from src.rag.models import (PipelineResult,PipelineStatus,QueryTranslationConfig,
                             ChunkingConfig,RetrievalConfig,PostRetrievalConfig,PipelineConfig)
 from typing import Optional
-
+from datetime import datetime
 class CompareResponse(BaseModel):
     job_id:str
     result1:PipelineResult
@@ -31,7 +31,7 @@ class CompareRequest(BaseModel):
     query:str = Field(...,min_length=1)
 
 class DeepEvalScores(BaseModel):
-    faithulness: float
+    faithfulness: float
     context_recall:float
     context_precision:float
     answer_relevance: float
@@ -47,13 +47,36 @@ class DeepEvalResponse(BaseModel):
     scores_1:DeepEvalScores
     scores_2:DeepEvalScores
 
-class GoldenSetItem(BaseModel):
+class DatasetItemCreate(BaseModel):
     question:str
-    answer:str
+    ground_truth:str
+
+class DatasetCreateQuery(BaseModel):
+    name:str
+    description:str
+    items: list[DatasetItemCreate]
+
+class DatasetItemResponse(BaseModel):
+    id:UUID4
+    question:str
+    ground_truth:str
+
+class DatasetResponse(BaseModel):
+    id:UUID4
+    name:str
+    description:Optional[str] = None
+    created_at:datetime
+    items: list[DatasetItemResponse]
+
+class DatasetListResponse(BaseModel):
+    id:UUID4
+    name:str
+    description:Optional[str] = None
+    created_at:datetime
 
 class BenchmarkRequest(BaseModel):
     pipeline_ids:list[PipelineConfig]
-    golden_set:list[GoldenSetItem]
+    dataset_id:str
 
     @field_validator("pipeline_ids")
     @classmethod
@@ -62,14 +85,29 @@ class BenchmarkRequest(BaseModel):
             raise ValueError("At least one pipeline_id required")
         return v
 
-    @field_validator("golden_set")
+    @field_validator("dataset_id")
     @classmethod
-    def must_have_at_least_one_item(cls, v):
+    def must_not_be_empty(cls, v):
         if not v:
-            raise ValueError("Golden set cannot be empty")
+            raise ValueError("dataset_id cannot be empty")
         return v
     
-class BenchmarkResponse(BaseModel):
-    task_id:str
-    status:str = "Pending"
-    pipeline_count:int
+
+class PipelineScores(BaseModel):
+    pipeline_id: UUID4
+    pipeline_name:str
+    scores:DeepEvalScores
+
+class BenchmarkResultResponse(BaseModel):
+    benchmark_id: UUID4
+    status:str
+    results:list[PipelineScores] | None = None
+    error:str|None = None
+
+class CompareStatusResponse(BaseModel):
+    comparison_id:UUID4
+    status:str = "pending"
+    query:str
+    result_1:str
+    result_2:str
+    evaluation_scores:dict

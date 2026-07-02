@@ -9,7 +9,10 @@ from src.database.models.chunk_trace import ChunkTraceModel
 from src.rag.pipeline import run_pipeline
 import asyncio
 from src.api.task import run_deep_eval
-from src.api.schema import CompareRequest,CompareResponse
+from src.api.schema import CompareRequest,CompareResponse,CompareStatusResponse
+from src.database.models.compare import ComparisonModel
+import uuid
+from sqlalchemy.orm import joinedload
 
 router = APIRouter()
 
@@ -89,9 +92,41 @@ async def compare(payload:CompareRequest,db:AsyncSession=Depends(get_db)):
     db.add_all([result1,result2])
     await db.flush()
 
-    job = run_deep_eval.delay(result_id1=result1.id,result_id2=result2.id,config_1_dict=config1.model_dump(mode='json'),config_2_dict=config2.model_dump(mode='json'))
+    comparison_id = ComparisonModel(
+        query=query,
+        status="pending",
+        result_1_id=result1.id,
+        result_2_id=result2.id,
+    )
+    db.add(comparison_id)
+    await db.flush()
+
+    job = run_deep_eval.delay(comparison_id=comparison_id.id ,result_id1=result1.id,result_id2=result2.id,config_1_dict=config1.model_dump(mode='json'),config_2_dict=config2.model_dump(mode='json'))
 
     pipeline_result1.id = result1.id
     pipeline_result2.id = result2.id
 
     return  CompareResponse(job_id=job.id,result1=pipeline_result1,result2=pipeline_result2)
+
+@router.get("/compare/{comparison_id}",tags=["compare"])
+async def get_comparison_id_status(comparison_id_id:uuid.UUID,db:AsyncSession=Depends(get_db)):
+    stmt = (
+        select(ComparisonModel)
+        .options(joinedload(ComparisonModel.result_a), joinedload(ComparisonModel.result_b))
+        .where(ComparisonModel.id == comparison_id_id)
+    )
+    result = await db.execute(stmt)
+    comparison_row = result.scalar_one_or_none()
+
+    if not comparison_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Comparison trace not found")
+    
+    response =  CompareStatusResponse(
+        comparison_id=comparison_row.id,
+        status=comparison_row.status,
+        query=comparison_row.query,
+        result_1=comparison_row.result_1_id,
+        result_2=comparison_row.result_2_id,
+        evaluation_scores=comparison_row.evaluation_scores
+    )
+    return response

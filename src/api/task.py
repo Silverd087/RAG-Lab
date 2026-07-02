@@ -17,7 +17,12 @@ from deepeval.dataset import EvaluationDataset
 from deepeval import evaluate
 from src.rag.core import get_llm
 from sqlalchemy.orm import joinedload
-from src.api.schema import DeepEvalScores,DeepEvalResponse
+from src.api.schema import PipelineScores,DeepEvalResponse,BenchmarkResultResponse,DeepEvalScores
+from src.rag.pipeline import run_pipeline
+import asyncio
+from src.database.models.benchmark import DatasetModel,BenchmarkModel
+from sqlalchemy.orm import joinedload
+from src.database.models.compare import ComparisonModel
 
 def update_pipeline_status(db:Session,pipeline_id:str,status:str,error:str=None):
     pipeline = db.query(PipelineModel).filter(PipelineModel.id == pipeline_id).first()
@@ -28,8 +33,22 @@ def update_pipeline_status(db:Session,pipeline_id:str,status:str,error:str=None)
         pipeline.error = error
 
 
+async def build_benchmark_dataset(golden_set:list,config:PipelineConfig):
+
+    test_cases = []
+    for item in golden_set:
+        result,answer = await run_pipeline(config=config,query=item["question"])
+
+        test_case = LLMTestCase(input=item["question"],
+                        expected_output=item["ground_truth"],
+                        actual_output=answer,
+                        context=[c.content for c in result.chunks])
+        
+        test_cases.append(test_case)
+    return EvaluationDataset(test_cases)
+
 @shared_task
-def ingest_task(config_dict:dict,object_name:str,)->None:
+def ingest_task(config_dict:dict,object_name:str)->None:
     pipeline_config = PipelineConfig.model_validate(config_dict)
     minio_client = get_minio_client()
     response = None
@@ -63,7 +82,8 @@ def ingest_task(config_dict:dict,object_name:str,)->None:
 
 
 @shared_task
-def run_deep_eval(result_id1:str,result_id2:str,config_1_dict:dict,config_2_dict:dict,db:Session=get_sync_db()):
+def run_deep_eval(comparison_id_id:str,result_id1:str,result_id2:str,config_1_dict:dict,config_2_dict:dict,db:Session=get_sync_db):
+
 
     stmt = (
         select(PipelineResultModel)
@@ -107,19 +127,104 @@ def run_deep_eval(result_id1:str,result_id2:str,config_1_dict:dict,config_2_dict
 
     results = evaluate(test_cases=dataset,metrics=metrics)
 
+    scores = []
+    for test_case_result in results.test_results:
+        m_data = test_case_result.metrics_data
+            
+        pipeline_score = DeepEvalScores(
+            faithfulness=m_data[0].score,
+            answer_relevance=m_data[1].score,
+            context_precision=m_data[2].score,
+            context_recall=m_data[3].score
+        )
+        scores.append(pipeline_score)
+
+    stmt = select(ComparisonModel).where(ComparisonModel.id == comparison_id_id)
+    result = db.execute(stmt)
+    comparison_id_row = result.scalar_one_or_none()
+    if comparison_id_row:
+       comparison_id_row.evaluation_scores = {
+                "pipeline_a": scores[0].model_dump(),
+                "pipeline_b": scores[1].model_dump()
+            }
+       comparison_id_row.status = "completed"
+
     return (
         DeepEvalResponse(
-            scores_1=DeepEvalScores(faithulness=result.test_result[0].metrics_data[0].score,
-                       answer_relevance=results.test_results[0].metrics_data[1].score,
-                       context_precision=results.test_results[0].metrics_data[2].score,
-                       context_recall=results.test_results[0].metrics_data[3].score
-                       ),
-            scores_2=DeepEvalScores(faithulness=result.test_result[1].metrics_data[0].score,
-                        answer_relevance=results.test_results[1].metrics_data[1].score,
-                        context_precision=results.test_results[1].metrics_data[2].score,
-                        context_recall=results.test_results[1].metrics_data[3].score
-                       )
+            scores_1=scores[0],
+            scores_2=scores[1]
         )
 
     )
 
+@shared_task
+def evaluate_single_pipeline(pipeline_id:str,dataset_id:str):
+    db:Session=get_sync_db()
+    stmt = select(PipelineModel).where(PipelineModel.id == pipeline_id)
+    result = db.execute(stmt)
+
+    pipeline_row = result.scalar_one_or_none()
+
+    pipeline_config = PipelineConfig(
+        id=pipeline_row.id, name=pipeline_row.name, created_at=pipeline_row.created_at, status=pipeline_row.status, **pipeline_row.config
+        )
+    
+    stmt = select(DatasetModel).options(joinedload(DatasetModel.items)).where(DatasetModel.id == dataset_id)
+    result = db.execute(stmt)
+
+    dataset_row = result.scalar_one_or_none()
+
+
+    dataset = asyncio.run(build_benchmark_dataset(golden_set=dataset_row.items,config=pipeline_config))
+
+    eval_model = get_llm(pipeline_config)
+
+    metrics = [
+        FaithfulnessMetric(threshold=0.7, model=eval_model),
+        AnswerRelevancyMetric(threshold=0.7, model=eval_model),
+        ContextualPrecisionMetric(threshold=0.7, model=eval_model),
+        ContextualRecallMetric(threshold=0.7, model=eval_model)
+    ]
+
+    result = evaluate(test_cases=dataset,metrics=metrics)
+
+    total_faithfulness = 0.0
+    total_relevance = 0.0
+    total_precision = 0.0
+    total_recall = 0.0
+    num_cases = len(result.test_results)
+
+    for test_case in result.test_results:
+
+        total_faithfulness += test_case.metrics_data[0].score
+        total_relevance += test_case.metrics_data[1].score
+        total_precision += test_case.metrics_data[2].score
+        total_recall += test_case.metrics_data[3].score
+
+    mean_scores = DeepEvalScores(
+        faithfulness=round(total_faithfulness / num_cases, 2) if num_cases > 0 else 0,
+        answer_relevance=round(total_relevance / num_cases, 2) if num_cases > 0 else 0,
+        context_precision=round(total_precision / num_cases, 2) if num_cases > 0 else 0,
+        context_recall=round(total_recall / num_cases, 2) if num_cases > 0 else 0
+    )
+    return  PipelineScores(
+        pipeline_id=pipeline_id,
+        pipeline_name=pipeline_config.name,
+        scores=mean_scores
+    ).model_dump()
+
+@shared_task
+def aggregate_benchmark_results(results:list[DeepEvalScores],benchmark_id:str):
+    db:Session = get_sync_db()
+    stmt = select(BenchmarkModel).where(BenchmarkModel.id == benchmark_id)
+    result = db.execute(stmt)
+
+    benchmark_row = result.scalar_one_or_none()
+
+    benchmark_row.compiled_results = results
+    benchmark_row.status = "completed"
+    return BenchmarkResultResponse(
+        benchmark_id= benchmark_id,
+        status="completed",
+        results=results
+    ).model_dump()
