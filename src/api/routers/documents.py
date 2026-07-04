@@ -8,7 +8,7 @@ from src.database.models.pipeline import PipelineModel
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.rag.models import PipelineConfig
-from src.api.schema import UploadResponse
+from src.api.schema import UploadResponse,DocumentResponse
 from sqlalchemy import select
 
 ALLOWED_EXTENSIONS = {".pdf"}
@@ -61,3 +61,26 @@ async def upload(id:uuid.UUID,file:UploadFile,db:AsyncSession = Depends(get_db))
 
 
     return UploadResponse(job_id=result.id)
+
+@router.get("/pipelines/{id}/documents",tags=["documents"],response_model=list[DocumentResponse])
+async def get_documents(id:uuid.UUID,db:AsyncSession=Depends(get_db)):
+    minio_client = get_minio_client()
+
+    stmt = select(PipelineModel).where(PipelineModel.id == id)
+    result = await db.execute(stmt)
+    pipeline_row = result.scalar_one_or_none()
+
+    if not pipeline_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="pipeline id not found")
+
+    prefix = f"pipelines/{id}/"
+    objects = minio_client.list_objects(settings.minio_bucket_name, prefix=prefix, recursive=True)
+
+    return [
+        DocumentResponse(
+            name=obj.object_name[len(prefix):],
+            size=obj.size,
+            last_modified=obj.last_modified,
+        )
+        for obj in objects
+    ]

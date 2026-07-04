@@ -34,6 +34,8 @@ class BenchmarkModel(Base):
     id:Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dataset_id:Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("datasets.id"), nullable=False)
     status:Mapped[str] = mapped_column(String, default="pending")
-    
-    compiled_results:Mapped[dict] = mapped_column(JSONB, nullable=True)
+    created_at:Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
+    compiled_results:Mapped[list|None] = mapped_column(JSONB, nullable=True)
+    error_log:Mapped[str|None] = mapped_column(Text, nullable=True)
     dataset = relationship("DatasetModel", back_populates="benchmarks")

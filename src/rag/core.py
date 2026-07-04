@@ -85,7 +85,7 @@ def get_vectorstore(config:PipelineConfig)-> QdrantVectorStore:
     if config.retrieval.mode == RetrievalMode.HYBRID:
         vectorstore = QdrantVectorStore(
         client=get_client(),
-        embedding=get_embeddings(),
+        embedding=get_embeddings(config),
         collection_name=f"collection_{config.id}",
         retrieval_mode=RetrievalMode.HYBRID,
         sparse_embedding=get_sparse_embeddings(),

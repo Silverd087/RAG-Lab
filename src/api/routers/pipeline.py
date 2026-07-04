@@ -59,8 +59,6 @@ async def delete_pipeline_by_id(id:uuid.UUID,db:AsyncSession = Depends(get_db)):
 
 @router.post("/pipelines",tags=['pipeline'],status_code=status.HTTP_201_CREATED,response_model=PipelineConfig)
 async def get_pipeline_by_id(body:PipelineConfig,db:AsyncSession = Depends(get_db)):
-    if not body:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Invalid request: config body is empty")
     new_pipeline = PipelineModel(
         id=body.id,
         name=body.name,

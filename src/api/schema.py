@@ -4,13 +4,18 @@ from src.rag.models import (PipelineResult,PipelineStatus,QueryTranslationConfig
 from typing import Optional
 from datetime import datetime
 class CompareResponse(BaseModel):
-    job_id:str
+    comparison_id:UUID4
     result1:PipelineResult
     result2:PipelineResult
 
 class UploadResponse(BaseModel):
     status:PipelineStatus = PipelineStatus.INGESTING
     job_id:str
+
+class DocumentResponse(BaseModel):
+    name:str
+    size:Optional[int] = None
+    last_modified:Optional[datetime] = None
 
 class PipelineUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1)
@@ -111,14 +116,20 @@ class BenchmarkRequest(BaseModel):
 
 class PipelineScores(BaseModel):
     pipeline_id: UUID4
-    pipeline_name:str
-    scores:DeepEvalScores
+    scores:Optional[DeepEvalScores] = None
+    status:str
+    error:Optional[str] = None
 
 class BenchmarkResultResponse(BaseModel):
     benchmark_id: UUID4
+    dataset_id: UUID4
     status:str
+    created_at: datetime
     results:list[PipelineScores] | None = None
     error:str|None = None
+
+class BenchmarkListResponse(BaseModel):
+    benchmarks:list[BenchmarkResultResponse]
 
 class CompareStatusResponse(BaseModel):
     comparison_id:UUID4
@@ -127,3 +138,15 @@ class CompareStatusResponse(BaseModel):
     result_1:str
     result_2:str
     evaluation_scores:dict
+
+class DatasetUpdateQuery(BaseModel):
+    name:Optional[str] = None
+    description:Optional[str] = None
+
+    model_config=ConfigDict(str_strip_whitespace=True,str_min_length=1)
+
+class DatasetItemUpdateQuery(BaseModel):
+    question:Optional[str] = None
+    ground_truth:Optional[str] = None
+
+    model_config=ConfigDict(str_strip_whitespace=True,str_min_length=1)

@@ -16,10 +16,6 @@ router = APIRouter()
 @router.post("/pipelines/{id}/query",tags=["query"],response_model=PipelineResult)
 async def query_pipeline(id:uuid.UUID,payload:QueryRequest,db:AsyncSession = Depends(get_db)):
     query = payload.query
-    if not query:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Query must not be empty')
-    if not id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Pipeline id must not be empty')
 
     stmt = select(PipelineModel).where(PipelineModel.id == id)
     result = await db.execute(stmt)
@@ -64,8 +60,6 @@ async def query_pipeline(id:uuid.UUID,payload:QueryRequest,db:AsyncSession = Dep
 
 @router.get("/pipelines/{id}/results",status_code=status.HTTP_200_OK,response_model=list[PipelineResult])
 async def get_pipeline_history(id:uuid.UUID,db:AsyncSession = Depends(get_db)):
-    if not id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Pipeline id must not be empty')
     
     stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == id)
     result = await db.execute(stmt)

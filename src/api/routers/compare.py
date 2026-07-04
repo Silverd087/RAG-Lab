@@ -21,10 +21,6 @@ async def compare(payload:CompareRequest,db:AsyncSession=Depends(get_db)):
     query = payload.query
     pipeline_id1 = payload.pipeline_id1
     pipeline_id2 = payload.pipeline_id2
-    if not query:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Query must not be empty')
-    if not pipeline_id1 or not pipeline_id2:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Both pipeline ids must not be empty')
     
     stmt = select(PipelineModel).where(PipelineModel.id.in_([pipeline_id1,pipeline_id2]))
     result = await db.execute(stmt)
@@ -101,12 +97,12 @@ async def compare(payload:CompareRequest,db:AsyncSession=Depends(get_db)):
     db.add(comparison)
     await db.flush()
 
-    job = run_deep_eval.delay(comparison_id=comparison.id ,result_id1=result1.id,result_id2=result2.id,config_1_dict=config1.model_dump(mode='json'),config_2_dict=config2.model_dump(mode='json'))
+    run_deep_eval.delay(comparison_id=comparison.id ,result_id1=result1.id,result_id2=result2.id,config_1_dict=config1.model_dump(mode='json'),config_2_dict=config2.model_dump(mode='json'))
 
     pipeline_result1.id = result1.id
     pipeline_result2.id = result2.id
 
-    return  CompareResponse(job_id=job.id,result1=pipeline_result1,result2=pipeline_result2)
+    return  CompareResponse(comparison_id=comparison.id,result1=pipeline_result1,result2=pipeline_result2)
 
 @router.get("/compare/{comparison_id}",tags=["compare"])
 async def get_comparison_id_status(comparison_id:uuid.UUID,db:AsyncSession=Depends(get_db)):
