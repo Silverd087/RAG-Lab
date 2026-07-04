@@ -1,0 +1,123 @@
+.content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.controlCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-3);
+  border-radius: var(--radius-3xl);
+  padding: 20px;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: var(--bg-input-alt);
+  border: 1px solid var(--border-6);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.chip[data-active='true'] {
+  background: var(--pill-brand-bg);
+  border-color: var(--brand);
+  color: var(--text-accent);
+}
+
+.runningRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  animation: pulseDot 1.2s ease infinite;
+}
+
+.sectionLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.pastGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.pastCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-3);
+  border-radius: var(--radius-2xl);
+  padding: 14px;
+  text-align: left;
+}
+.pastCard:hover {
+  border-color: var(--border-hover);
+}
+
+.pastDataset {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pastMeta {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.pastStatus {
+  margin-top: 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.pastStatus[data-status='completed'] {
+  color: var(--green);
+}
+
+.pastStatus[data-status='completed_with_errors'] {
+  color: var(--red);
+}
+
+.pendingNote {
+  font-size: 13px;
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border: 1px solid var(--border-3);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  line-height: 1.6;
+}
+
+.failedTag {
+  color: var(--red);
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+}

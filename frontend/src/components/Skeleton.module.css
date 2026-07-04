@@ -1,0 +1,6 @@
+.skel {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, #141414, #1e1e1e, #141414);
+  background-size: 200% 100%;
+  animation: skel 1.4s ease infinite;
+}

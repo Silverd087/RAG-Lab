@@ -1,0 +1,19 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.range {
+  flex: 1;
+  accent-color: var(--brand);
+  height: 4px;
+}
+
+.readout {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  min-width: 44px;
+  text-align: right;
+}

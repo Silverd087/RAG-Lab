@@ -1,0 +1,137 @@
+.wrap {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.stepNav {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-2);
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.stepItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 9px 10px;
+  border-radius: var(--radius-med);
+  font-size: 13.5px;
+  color: var(--text-dim);
+  text-align: left;
+}
+
+.stepItem[data-active='true'] {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+.stepCircle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-button);
+  border: 1px solid var(--border-6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.stepCircle[data-active='true'] {
+  border-color: var(--brand);
+  color: var(--brand-2);
+}
+
+.stepCircle[data-done='true'] {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 32px;
+  overflow-y: auto;
+  max-width: 620px;
+}
+
+.progressTrack {
+  height: 3px;
+  background: var(--border-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--brand);
+  transition: width 0.25s ease;
+}
+
+.stepTitle {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+
+.stepDesc {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  margin: 0 0 24px;
+}
+
+.body {
+  flex: 1;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-2);
+  margin-top: 20px;
+}
+
+.review {
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.reviewRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--border-2);
+  font-size: 13px;
+}
+
+.reviewRow:first-child {
+  border-top: none;
+}
+
+.reviewKey {
+  color: var(--text-dim);
+}
+
+.reviewValue {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  text-align: right;
+}

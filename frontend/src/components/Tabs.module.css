@@ -1,0 +1,26 @@
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-2);
+}
+
+.tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 10px 4px;
+  margin-right: 20px;
+  transition: color 0.15s ease;
+}
+
+.tab[data-active='true'] {
+  color: var(--text-primary);
+  border-bottom-color: var(--brand);
+}
+
+.tab:not([data-active='true']):hover {
+  color: var(--text-secondary);
+}

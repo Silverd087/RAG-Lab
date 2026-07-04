@@ -1,0 +1,33 @@
+.table {
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.headRow,
+.row {
+  display: grid;
+  grid-template-columns: var(--cols);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+}
+
+.headRow {
+  background: var(--bg-card);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.row {
+  border-top: 1px solid var(--border-2);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}

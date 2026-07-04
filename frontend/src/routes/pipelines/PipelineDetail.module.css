@@ -1,0 +1,61 @@
+.content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.tabBody {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dropzone {
+  border: 1.5px dashed var(--border-6);
+  border-radius: var(--radius-3xl);
+  padding: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dropzone[data-active='true'],
+.dropzone:hover {
+  border-color: var(--brand);
+  color: var(--text-secondary);
+}
+
+.dropText {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.dropHint {
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--text-dimmer);
+}
+
+.docName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--text-dim);
+  font-size: 13px;
+}

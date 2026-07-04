@@ -1,0 +1,13 @@
+.wrap {
+  display: flex;
+  gap: 4px;
+  padding: 10px 4px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  animation: typing 1.2s ease infinite;
+}

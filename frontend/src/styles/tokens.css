@@ -1,0 +1,66 @@
+:root {
+  --bg-page: #0a0a0a;
+  --bg-sidebar: #0d0d0d;
+  --bg-panel: #0e0e0e;
+  --bg-card: #111111;
+  --bg-input: #151515;
+  --bg-input-alt: #161616;
+  --bg-button: #181818;
+
+  --border-1: #1c1c1c;
+  --border-2: #191919;
+  --border-3: #222222;
+  --border-4: #242424;
+  --border-5: #262626;
+  --border-6: #2a2a2a;
+  --border-7: #2f2f2f;
+  --border-hover: #3a3a3a;
+
+  --text-primary: #ededed;
+  --text-secondary: #c4c4c4;
+  --text-accent: #c4b5fd;
+  --text-tertiary: #a1a1a1;
+  --text-tertiary-2: #a8a8a8;
+  --text-muted: #8a8a8a;
+  --text-dim: #6b6b6b;
+  --text-dimmer: #5a5a5a;
+  --text-d4: #d4d4d4;
+  --text-b4: #b4b4b4;
+
+  --brand: #7c3aed;
+  --brand-2: #a855f7;
+  --brand-gradient: linear-gradient(135deg, #7c3aed, #a855f7);
+
+  --green: #10b981;
+  --green-dark: #065f46;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --gray: #8a8a8a;
+  --blue: #60a5fa;
+  --purple-dark: #4c1d95;
+
+  --pill-green-bg: rgba(16, 185, 129, 0.14);
+  --pill-amber-bg: rgba(245, 158, 11, 0.14);
+  --pill-red-bg: rgba(239, 68, 68, 0.14);
+  --pill-gray-bg: rgba(139, 139, 139, 0.14);
+  --pill-brand-bg: rgba(124, 58, 237, 0.12);
+
+  --radius-xs: 4px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+  --radius-med: 7px;
+  --radius-lg: 8px;
+  --radius-xl: 9px;
+  --radius-2xl: 10px;
+  --radius-3xl: 12px;
+  --radius-4xl: 20px;
+  --radius-full: 999px;
+
+  --shadow-logo: 0 0 16px rgba(124, 58, 237, 0.45);
+  --shadow-btn: 0 0 0 1px rgba(124, 58, 237, 0.5), 0 4px 14px rgba(124, 58, 237, 0.35);
+  --shadow-toast: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --shadow-panel: -20px 0 60px rgba(0, 0, 0, 0.5);
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}

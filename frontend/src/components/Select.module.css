@@ -1,0 +1,22 @@
+.select {
+  height: 38px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-6);
+  border-radius: var(--radius-med);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  padding: 0 12px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.select:focus {
+  border-color: var(--brand);
+}
+
+.textarea {
+  height: auto;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
