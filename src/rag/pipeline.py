@@ -13,8 +13,6 @@ async def run_pipeline(config:PipelineConfig,query:str)->tuple[PipelineResult,st
     search_query,translation_trace = await translate_query(query=query,config=config)
     latency["query_translation_ms"] = int((time.time() - t0)*1000)
     full_trace.update(translation_trace)
-    print("translation_trace:", translation_trace)
-    print("search_query:", search_query[:100])
 
     # step 2 — retrieval
     t0 = time.time()

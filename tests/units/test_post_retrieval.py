@@ -3,7 +3,6 @@ from src.rag.steps.post_retrieval import _deduplicate,post_retrieval,_rrf_score,
 from langchain_core.documents import Document
 
 
-pytestmark = pytest.mark.asyncio
 
 class TestDeduplicate:
     def test_removes_duplicates(self,duplicate_docs):

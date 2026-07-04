@@ -243,6 +243,7 @@ class TestDeleteDataset:
         result = await db_session.execute(stmt)
         dataset_item_rows = result.scalars().all()
         assert len(dataset_item_rows) == 0
+        assert dataset_item_rows == []
 
     async def test_delete_nonexistent_dataset_returns_404(self,client,dataset,db_session):
         dataset_id = uuid.uuid4()

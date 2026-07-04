@@ -91,7 +91,7 @@ class DatasetListResponse(BaseModel):
     created_at:datetime
 
 class BenchmarkRequest(BaseModel):
-    pipeline_ids:list[PipelineConfig]
+    pipeline_ids:list[UUID4]
     dataset_id:str
 
     @field_validator("pipeline_ids")

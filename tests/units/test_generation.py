@@ -1,7 +1,6 @@
 import pytest
 from src.rag.steps.generation import generate,format_docs
 
-pytestmark = pytest.mark.asyncio
 
 
 class TestGenerate:

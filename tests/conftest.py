@@ -422,3 +422,24 @@ async def datasets(client):
     return [response_1.json(),response_2.json()]
 
 
+@pytest.fixture(autouse=True)
+def mock_celery_chord(mocker):
+    mock_chord_result = MagicMock()
+    mock_chord_result.id = "mock-chord-id"
+
+    mock_chord_instance = MagicMock()
+    mock_chord_instance.return_value = mock_chord_result
+
+    mock_chord = mocker.patch("src.api.routers.benchmark.chord")
+    mock_chord.return_value = mock_chord_instance
+
+    mocker.patch(
+        "src.api.routers.benchmark.evaluate_single_pipeline.s",
+        side_effect=lambda *args, **kwargs: MagicMock(pipeline_id=args[0])
+    )
+    mocker.patch(
+        "src.api.routers.benchmark.aggregate_benchmark_results.s",
+        return_value=MagicMock()
+    )
+
+    return mock_chord

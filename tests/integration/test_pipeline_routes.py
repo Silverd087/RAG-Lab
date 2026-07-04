@@ -3,8 +3,9 @@ import pytest
 import asyncio
 import uuid
 from unittest.mock import MagicMock, AsyncMock
+from sqlalchemy import select
+from src.database.models.pipeline_result import PipelineResultModel
 
-pytestmark = pytest.mark.asyncio
 
 class TestCreatePipeline:
     async def test_create_pipeline_returns_201(self,client):
@@ -190,8 +191,14 @@ class TestDeletePipeline:
         response = await client.delete(f"/api/v1/pipelines/{random_id}")
         assert response.status_code == 404
 
-    ##async def test_delete_pipeline_cascades_to_results(self,client):
-    ## TO DO
+    async def test_delete_pipeline_cascades_to_results(self,client,pipeline,db_session):
+        response = await client.delete(f"/api/v1/pipelines/{pipeline["id"]}")
+        stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == pipeline["id"])
+        result = await db_session.execute(stmt)
+        pipeline_results = result.scalars().all()
+        assert len(pipeline_results) == 0
+        assert pipeline_results == []
+
 
 class TestUpdatePipeline:
 

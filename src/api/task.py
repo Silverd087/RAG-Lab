@@ -149,13 +149,6 @@ def run_deep_eval(comparison_id_id:str,result_id1:str,result_id2:str,config_1_di
             }
        comparison_id_row.status = "completed"
 
-    return (
-        DeepEvalResponse(
-            scores_1=scores[0],
-            scores_2=scores[1]
-        )
-
-    )
 
 @shared_task
 def evaluate_single_pipeline(pipeline_id:str,dataset_id:str):

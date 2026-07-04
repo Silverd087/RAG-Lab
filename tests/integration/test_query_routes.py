@@ -53,7 +53,6 @@ class TestQueryPipeline:
         response = await client.post(f"/api/v1/pipelines/{ready_pipeline["id"]}/query",json={"query":"what is attention"})
         assert response.status_code == 200
         data = response.json()
-        print(data)
         stmt = select(PipelineResultModel).where(PipelineResultModel.id == data["id"])
         result = await db_session.execute(stmt)
         pipeline_row = result.scalar_one_or_none()
@@ -78,7 +77,6 @@ class TestQueryPipeline:
     async def test_query_with_hyde_returns_translated_query(self,client,ready_hyde_pipeline):
         response = await client.post(f"/api/v1/pipelines/{ready_hyde_pipeline["id"]}/query",json={"query":"what is attention"})
         data = response.json()
-        print(data)
         assert "translated_query" in data
         assert isinstance(data["translated_query"],str)
     async def test_query_with_multiquery_returns_query_variants(self,client,ready_multiquery_pipeline):

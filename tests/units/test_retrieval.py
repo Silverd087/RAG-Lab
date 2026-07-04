@@ -3,7 +3,6 @@ from src.rag.steps.retrieval import retrieve
 from langchain_core.documents import Document
 
 
-pytestmark = pytest.mark.asyncio
 
 class TestRetrieve:
     async def test_returns_docs_and_trace(self,base_config):

@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings,SettingsConfigDict
 class Settings(BaseSettings):
     qdrant_url:str = "http://localhost:6333"
     redis_url: str = "http://localhost:6379"
@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     minio_access_keys:str
     minio_secret_keys:str
     minio_bucket_name:str
-    class Config:
-        env_file = ".env"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"
+    )
 
 settings = Settings()

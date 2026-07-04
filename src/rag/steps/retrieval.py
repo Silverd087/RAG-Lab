@@ -46,9 +46,9 @@ async def _parent_doc_retrieve(query:str,config:PipelineConfig)->list[Document]:
 async def _mmr_doc_retrieve(query:str,config:PipelineConfig)->list[Document]:
         vectorstore = get_vectorstore(config)
         embeddings = get_embeddings(config)
-        embedded_query = asyncio.to_thread(embeddings.embed_query,query)
+        embedded_query = await asyncio.to_thread(embeddings.embed_query,query)
 
-        results = asyncio.to_thread(
+        results = await asyncio.to_thread(
              vectorstore.max_marginal_relevance_search_with_score_by_vector,
              embedding=embedded_query,
              k=config.retrieval.top_k,

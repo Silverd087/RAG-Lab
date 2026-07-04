@@ -10,7 +10,7 @@ async def post_retrieval(config:PipelineConfig,trace:dict,query:str,docs:list[Do
     docs = _deduplicate(docs)
     post_trace["doc_count_after_dedup"] = len(docs)
 
-    if config.post_retrieval.reranker == RerankerConfig.RECIPROCAL_RANK_FUSION:
+    if config.post_retrieval.reranker == RerankerConfig.RECIPROCAL_RANK_FUSION and config.query_translation.multi_query:
         raw_results = trace["raw_results"]
         if raw_results:
             docs = _rrf_score(all_results=raw_results,top_n=config.post_retrieval.top_n)

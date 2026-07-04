@@ -3,7 +3,6 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock
 
 
-pytestmark = pytest.mark.asyncio
 
 class TestUploadDocument:
     async def test_upload_pdf_returns_202(self,client,pipeline):

@@ -1,4 +1,4 @@
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_unstructured import UnstructuredLoader
 from qdrant_client.http.models import Distance, VectorParams,SparseVectorParams
 from src.rag.core import get_client
 from src.rag.models import PipelineConfig,ModeConfig
@@ -15,14 +15,11 @@ def ensure_collection(config:PipelineConfig):
 
 
 
-def run_ingest(file : str, config : PipelineConfig) -> None:
-    print(f"retrieval mode: {config.retrieval.mode}")
-    print(f"collection: collection_{config.id}")
-    
+def run_ingest(file : str, config : PipelineConfig) -> None:    
     if not file.endswith(".pdf"):
         raise ValueError(f"Expected a pdf file, got {file}")
     ensure_collection(config)
-    loader = PyPDFLoader(file)
+    loader = UnstructuredLoader(file)
     docs = loader.load()
 
     if not docs:

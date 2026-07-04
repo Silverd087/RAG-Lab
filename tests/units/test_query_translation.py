@@ -3,9 +3,6 @@ from src.rag.models import PipelineConfig,QueryTranslationConfig
 import pytest
 
 
-pytestmark = pytest.mark.asyncio
-
-
 
 class TestTranslateQuery:
     async def test_no_translation_returns_original(self,base_config):

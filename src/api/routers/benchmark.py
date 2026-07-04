@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload
 
 router = APIRouter()
 
-@router.post("/benchmarks",tags=["benchmark"])
+@router.post("/benchmarks",tags=["benchmark"],status_code=status.HTTP_202_ACCEPTED,response_model=BenchmarkResultResponse)
 async def run_benchmark(payload:BenchmarkRequest,db:AsyncSession = Depends(get_db)):
     pipeline_ids = payload.pipeline_ids
 
@@ -22,8 +22,6 @@ async def run_benchmark(payload:BenchmarkRequest,db:AsyncSession = Depends(get_d
 
     if not pipeline_rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="pipeline ids not foud")
-    
-
 
     if len(pipeline_rows) != len(pipeline_ids):
         found_ids = {str(p.id) for p in pipeline_rows}
@@ -61,7 +59,7 @@ async def run_benchmark(payload:BenchmarkRequest,db:AsyncSession = Depends(get_d
 
     callback = aggregate_benchmark_results.s(benchmark.id)
 
-    result = chord(header=header)(callback)
+    chord(header=header)(callback)
 
     return BenchmarkResultResponse(
         benchmark_id = benchmark.id,
