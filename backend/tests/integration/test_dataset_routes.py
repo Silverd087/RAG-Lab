@@ -326,3 +326,104 @@ class TestDeleteDatasetItem:
         assert response.status_code == 404
 
 
+class TestUpdateDataset:
+    async def test_update_description_returns_200(self, client, dataset):
+        payload={
+            "description": "updated description"
+        }
+        response = await client.patch(f"/api/v1/datasets/{dataset["id"]}",json=payload)
+        assert response.status_code == 200
+
+    async def test_update_description_persists(self, client, dataset):
+        payload={
+            "description": "updated description"
+        }
+        response = await client.patch(f"/api/v1/datasets/{dataset["id"]}",json=payload)
+        data = response.json()
+        assert "description" in data
+        assert data["description"] == "updated description"
+
+    async def test_update_name_returns_200(self, client, dataset):
+        payload={
+            "name": "updated name"
+        }
+        response = await client.patch(f"/api/v1/datasets/{dataset["id"]}",json=payload)
+        assert response.status_code == 200
+
+    async def test_update_name_only_leaves_description_untouched(self, client, dataset):
+        payload={
+            "name": "updated name"
+        }
+        response = await client.patch(f"/api/v1/datasets/{dataset["id"]}",json=payload)
+        data = response.json()
+        assert data["description"] == "toy dataset for integration tests"
+
+    async def test_update_nonexistent_dataset_returns_404(self, client):
+        id = uuid.uuid4()
+        payload={
+            "name": "updated name"
+        }
+        response = await client.patch(f"/api/v1/datasets/{id}",json=payload)
+        assert response.status_code == 404
+
+class TestUpdateDatasetItem:
+    async def test_update_item_returns_200(self, client, dataset):
+        payload = {
+            "question": "How many layers (N) make up the identical blocks in both the encoder and the decoder stacks of the Transformer architecture?",
+            "ground_truth": "Both the encoder and the decoder stacks are composed of an orchestration stack of N = 6 identical layers."
+        }
+        response = await client.patch(f"/api/v1/datasets/{dataset["id"]}/items/{dataset["items"][0]["id"]}",json=payload)
+        assert response.status_code == 200
+
+    async def test_update_item_persists_the_edited_question(self, client, dataset, db_session):
+        payload = {
+            "question": "How many layers (N) make up the identical blocks in both the encoder and the decoder stacks of the Transformer architecture?",
+        }
+        response = await client.patch(f"/api/v1/datasets/{dataset["id"]}/items/{dataset["items"][0]["id"]}",json=payload)        
+
+        stmt = select(DatasetItemModel).where(DatasetItemModel.id == dataset["items"][0]["id"])
+        result = await db_session.execute(stmt)
+        dataset_item_row = result.scalar_one_or_none()
+        assert dataset_item_row.question == payload["question"]
+
+    async def test_update_item_persists_the_edited_ground_truth(self, client, dataset, db_session):
+        payload = {
+            "ground_truth": "Both the encoder and the decoder stacks are composed of an orchestration stack of N = 6 identical layers."
+        }
+        
+        response = await client.patch(f"/api/v1/datasets/{dataset["id"]}/items/{dataset["items"][0]["id"]}",json=payload)        
+
+        stmt = select(DatasetItemModel).where(DatasetItemModel.id == dataset["items"][0]["id"])
+        result = await db_session.execute(stmt)
+        dataset_item_row = result.scalar_one_or_none()
+        assert dataset_item_row.ground_truth == payload["ground_truth"]
+
+    async def test_update_item_leaves_other_field_untouched_when_only_one_sent(self, client, dataset):
+        payload = {
+            "ground_truth": "Both the encoder and the decoder stacks are composed of an orchestration stack of N = 6 identical layers."
+        }
+        
+        response = await client.patch(f"/api/v1/datasets/{dataset["id"]}/items/{dataset["items"][0]["id"]}",json=payload)
+        data = response.json()
+        assert data["question"] == dataset["items"][0]["question"]
+
+    async def test_update_item_nonexistent_dataset_returns_404(self, client):
+        payload = {
+            "question": "How many layers (N) make up the identical blocks in both the encoder and the decoder stacks of the Transformer architecture?",
+            "ground_truth": "Both the encoder and the decoder stacks are composed of an orchestration stack of N = 6 identical layers."
+        }
+        dataset_id = uuid.uuid4()
+        item_id = uuid.uuid4()
+        response = await client.patch(f"/api/v1/datasets/{dataset_id}/items/{item_id}",json=payload)
+        assert response.status_code == 404    
+
+    async def test_update_nonexistent_item_returns_404(self, client, dataset):
+        payload = {
+            "question": "How many layers (N) make up the identical blocks in both the encoder and the decoder stacks of the Transformer architecture?",
+            "ground_truth": "Both the encoder and the decoder stacks are composed of an orchestration stack of N = 6 identical layers."
+        }
+        item_id = uuid.uuid4()
+        response = await client.patch(f"/api/v1/datasets/{dataset["id"]}/items/{item_id}",json=payload)
+        assert response.status_code == 404
+
+

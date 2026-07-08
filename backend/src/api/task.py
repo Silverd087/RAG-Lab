@@ -224,7 +224,7 @@ def aggregate_benchmark_results(results:list[dict],benchmark_id:str):
 
         benchmark_row = result.scalar_one_or_none()
 
-        benchmark_row.compiled_results = results
+        benchmark_row.results = results
 
         if failures:
             benchmark_row.status = "completed_with_errors"

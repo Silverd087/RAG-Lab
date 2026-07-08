@@ -17,7 +17,7 @@ async def post_retrieval(config:PipelineConfig,trace:dict,query:str,docs:list[Do
             post_trace["rrf_applied"] = True
 
     elif config.post_retrieval.reranker == RerankerConfig.COHERE:
-        docs,scores = _cohere_rerank()
+        docs,scores = _cohere_rerank(config,docs,query)
         post_trace["reranked_chunks"] = scores
     
     elif config.post_retrieval.reranker == RerankerConfig.CROSS_ENCODER:

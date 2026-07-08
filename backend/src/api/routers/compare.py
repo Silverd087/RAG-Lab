@@ -102,13 +102,13 @@ async def compare(payload:CompareRequest,db:AsyncSession=Depends(get_db)):
     pipeline_result1.id = result1.id
     pipeline_result2.id = result2.id
 
-    return  CompareResponse(comparison_id=comparison.id,result1=pipeline_result1,result2=pipeline_result2)
+    return  CompareResponse(id=comparison.id,result1=pipeline_result1,result2=pipeline_result2)
 
 @router.get("/compare/{comparison_id}",tags=["compare"])
 async def get_comparison_id_status(comparison_id:uuid.UUID,db:AsyncSession=Depends(get_db)):
     stmt = (
         select(ComparisonModel)
-        .options(joinedload(ComparisonModel.result_a), joinedload(ComparisonModel.result_b))
+        .options(joinedload(ComparisonModel.result_1), joinedload(ComparisonModel.result_2))
         .where(ComparisonModel.id == comparison_id)
     )
     result = await db.execute(stmt)
@@ -118,7 +118,7 @@ async def get_comparison_id_status(comparison_id:uuid.UUID,db:AsyncSession=Depen
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Comparison trace not found")
     
     response =  CompareStatusResponse(
-        comparison_id=comparison_row.id,
+        id=comparison_row.id,
         status=comparison_row.status,
         query=comparison_row.query,
         result_1=comparison_row.result_1_id,

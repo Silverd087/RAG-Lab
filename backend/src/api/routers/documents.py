@@ -20,8 +20,6 @@ router = APIRouter()
 
 @router.post("/pipelines/{id}/upload",tags=["documents"],status_code=status.HTTP_202_ACCEPTED,response_model=UploadResponse)
 async def upload(id:uuid.UUID,file:UploadFile,db:AsyncSession = Depends(get_db)):
-    if not file.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Missing file name')
     if not any(file.filename.endswith(ext) for ext in ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Bad file extension')
     if file.size is not None and file.size == 0:
@@ -74,7 +72,7 @@ async def get_documents(id:uuid.UUID,db:AsyncSession=Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="pipeline id not found")
 
     prefix = f"pipelines/{id}/"
-    objects = minio_client.list_objects(settings.minio_bucket_name, prefix=prefix, recursive=True)
+    objects = await minio_client.list_objects(settings.minio_bucket_name, prefix=prefix, recursive=True)
 
     return [
         DocumentResponse(

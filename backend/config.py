@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings,SettingsConfigDict
 class Settings(BaseSettings):
     qdrant_url:str = "http://localhost:6333"
-    redis_url: str = "http://localhost:6379"
+    redis_url: str = "redis://localhost:6379"
     google_api_key:str
     cohere_api_key:str
     postgres_user:str
@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     minio_access_keys:str
     minio_secret_keys:str
     minio_bucket_name:str
+    anthropic_api_key:str
+    voyage_api_key:str
 
     model_config = SettingsConfigDict(
         env_file=".env",

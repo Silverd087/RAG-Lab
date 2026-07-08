@@ -16,10 +16,10 @@ router = APIRouter()
 
 def _to_benchmark_response(row: BenchmarkModel) -> BenchmarkResultResponse:
     results = None
-    if row.compiled_results is not None:
-        results = [PipelineScores.model_validate(r) for r in row.compiled_results]
+    if row.results is not None:
+        results = [PipelineScores.model_validate(r) for r in row.results]
     return BenchmarkResultResponse(
-        benchmark_id=row.id,
+        id=row.id,
         dataset_id=row.dataset_id,
         status=row.status,
         created_at=row.created_at,

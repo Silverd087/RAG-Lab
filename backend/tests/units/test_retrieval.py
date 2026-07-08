@@ -44,3 +44,15 @@ class TestRetrieve:
         docs,trace = await retrieve("what is attention",config=parent_rerank_config)
         assert isinstance(docs,list)
 
+
+    async def test_returns_docs_from_vectorstore(self,mmr_config):
+        print(mmr_config)
+        docs,trace = await retrieve("what is attention",config=mmr_config)
+        assert isinstance(docs,list)
+
+    async def test_sets_score_metadata_on_returned_docs(self, mmr_config):
+        docs,trace = await retrieve("what is attention",config=mmr_config)
+        assert all(isinstance(doc.metadata["score"],float) for doc in docs)
+
+
+

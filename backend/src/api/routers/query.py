@@ -87,11 +87,6 @@ async def get_pipeline_history(id:uuid.UUID,db:AsyncSession = Depends(get_db)):
 
 @router.get("/pipelines/{id}/results/{result_id}",status_code=status.HTTP_200_OK,response_model=PipelineResult)
 async def get_pipeline_result(id:uuid.UUID,result_id:uuid.UUID,db:AsyncSession=Depends(get_db)):
-    if not id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='Pipeline id must not be empty')
-    
-    if not result_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail='result id must not be empty')
     
     stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == id and PipelineResultModel.id == result_id)
 

@@ -7,13 +7,16 @@ from src.rag.models import PipelineConfig
 from src.rag.models import ModeConfig
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain_cohere import CohereRerank
-from src.rag.models import ChunkingStrategy
+from src.rag.models import ChunkingStrategy,Provider
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.retrievers import ParentDocumentRetriever
 from langchain_community.storage import RedisStore
 from langchain_classic.storage._lc_store import create_kv_docstore
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_anthropic import ChatAnthropic
+from langchain_voyageai import VoyageAIEmbeddings
+
 
 _client: QdrantClient | None = None
 _embeddings:  dict[str, GoogleGenerativeAIEmbeddings] = {}
@@ -56,13 +59,20 @@ def get_client()->QdrantClient:
 def get_embeddings(config:PipelineConfig)->GoogleGenerativeAIEmbeddings:
     model =  config.indexing.embedding_model
     if model not in _embeddings:
-        _embeddings[model] = GoogleGenerativeAIEmbeddings(model=model,google_api_key=settings.google_api_key)
+        if config.indexing.provider == Provider.GOOGLE:
+            _embeddings[model] = GoogleGenerativeAIEmbeddings(model=model,google_api_key=settings.google_api_key)
+        if config.indexing.provider == Provider.ANTHROPIC:
+            _embeddings[model] = VoyageAIEmbeddings(model=model,voyage_api_key=settings.voyage_api_key)
+
     return _embeddings[model]
 
 def get_llm(config:PipelineConfig)->ChatGoogleGenerativeAI:
     model = config.generation.llm
     if model not in _llm:
-        _llm[model] = ChatGoogleGenerativeAI(model=config.generation.llm, temperature=0,google_api_key=settings.google_api_key)
+        if config.generation.provider == Provider.GOOGLE:
+            _llm[model] = ChatGoogleGenerativeAI(model=config.generation.llm, temperature=0,google_api_key=settings.google_api_key)
+        elif config.generation.provider == Provider.ANTHROPIC:
+            _llm[model] = ChatAnthropic(model=config.generation.llm, temperature=0,anthropic_api_key=settings.anthropic_api_key)
     return _llm[model]
 
 
@@ -82,7 +92,7 @@ def get_vectorstore(config:PipelineConfig)-> QdrantVectorStore:
             embedding=get_embeddings(config),
             collection_name=f"collection_{config.id}",
         )
-    if config.retrieval.mode == RetrievalMode.HYBRID:
+    elif config.retrieval.mode == RetrievalMode.HYBRID:
         vectorstore = QdrantVectorStore(
         client=get_client(),
         embedding=get_embeddings(config),

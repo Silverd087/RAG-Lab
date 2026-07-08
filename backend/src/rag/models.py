@@ -30,7 +30,7 @@ class ChunkingConfig(BaseModel):
         if not self.parent_doc:
             self.parent_overlap = None
             self.parent_chunk_size = None
-        elif self.parent_doc:
+        else:
             if self.parent_overlap is None:
                 self.parent_overlap = 200
             if self.parent_chunk_size is None:
@@ -41,8 +41,13 @@ class VectorDb(str,Enum):
     QDRANT = "qdrant"
     CHROMA = "chroma"
 
+class Provider(str,Enum):
+    GOOGLE = "google"
+    ANTHROPIC = "anthropic"
+
 class IndexingConfig(BaseModel):
     vector_db: VectorDb = VectorDb.QDRANT
+    provider:Provider = Provider.GOOGLE
     embedding_model: str = "gemini-embedding-001"
 
 class QueryTranslationConfig(BaseModel):
@@ -66,6 +71,7 @@ class RerankerConfig(str,Enum):
     CROSS_ENCODER = "cross-encoder"
     COHERE = "cohere"
     RECIPROCAL_RANK_FUSION = "reciprocal_rank_fusion"
+
 
 class PostRetrievalConfig(BaseModel):
     reranker: RerankerConfig = RerankerConfig.NONE
@@ -91,6 +97,7 @@ class Prompt(BaseModel):
 
 class GenerationConfig(BaseModel):
     llm: str = "gemini-2.5-flash"
+    provider:Provider = Provider.GOOGLE
     streaming: bool = False
     prompt: Optional[Prompt] = None
 
@@ -126,10 +133,9 @@ class PipelinePresets:
                                   top_n=5))
     @staticmethod
     def hyde_hybrid(name:str):
-        """HyDE query translation + hybrid BM25/dense retrieval"""
+        """hyde + hybrid BM25/dense retrieval"""
         return PipelineConfig(name=name,
-                              query_translation=QueryTranslationConfig(hyde=True),
-                              retrieval=RetrievalConfig(mode=ModeConfig.HYBRID))
+                              retrieval=RetrievalConfig(mode=ModeConfig.HYBRID),query_translation=QueryTranslationConfig(hyde=True))
     
     @staticmethod
     def parent_rerank(name: str) -> PipelineConfig:
@@ -168,6 +174,14 @@ class PipelinePresets:
     @staticmethod
     def rag_reorder(name:str):
         return PipelineConfig(name=name,post_retrieval=PostRetrievalConfig(reorder=True))
+    
+    @staticmethod
+    def rag_mmr(name:str):
+        return PipelineConfig(name=name,retrieval=RetrievalConfig(mode=ModeConfig.MMR))
+
+    @staticmethod
+    def rag_cohere(name:str):
+        return PipelineConfig(name=name,post_retrieval=PostRetrievalConfig(reranker=RerankerConfig.COHERE,top_n=2))
 
 class ChunkTrace(BaseModel):
     content:str

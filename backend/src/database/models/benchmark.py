@@ -36,6 +36,6 @@ class BenchmarkModel(Base):
     status:Mapped[str] = mapped_column(String, default="pending")
     created_at:Mapped[datetime] = mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
 
-    compiled_results:Mapped[list|None] = mapped_column(JSONB, nullable=True)
+    results:Mapped[list|None] = mapped_column(JSONB, nullable=True)
     error_log:Mapped[str|None] = mapped_column(Text, nullable=True)
     dataset = relationship("DatasetModel", back_populates="benchmarks")

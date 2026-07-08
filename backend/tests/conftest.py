@@ -16,6 +16,10 @@ from sqlalchemy import text
 from langchain_core.prompts import ChatPromptTemplate
 from unittest.mock import MagicMock,AsyncMock
 from src.database.models.pipeline import PipelineModel
+import uuid
+from datetime import datetime,timezone
+from src.database.models.benchmark import BenchmarkModel
+from src.api.schema import BenchmarkResultResponse
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -90,6 +94,21 @@ def fake_docs()->list[Document]:
     ]
 
 @pytest.fixture
+def mock_cohere_rerank_response():
+    result_1 = MagicMock()
+    result_1.index = 0
+    result_1.relevance_score = 0.99
+    result_1.page_content = "Chunk 1"
+    result_1.metadata = {"source": "test.pdf", "page": 2, "score": 0.81}
+
+    result_2 = MagicMock()
+    result_2.index = 1
+    result_2.relevance_score = 0.85
+    result_2.page_content = "Chunk 2"
+    result_2.metadata = {"source": "test.pdf", "page": 1, "score": 0.88}
+    return [result_1, result_2]
+
+@pytest.fixture
 def duplicate_docs(fake_docs)->list[Document]:
     return fake_docs + fake_docs
 
@@ -136,6 +155,14 @@ def reorder_config():
     return PipelinePresets.rag_reorder("test-reorder")
 
 @pytest.fixture
+def mmr_config():
+    return PipelinePresets.rag_mmr("test-mmr")
+
+@pytest.fixture()
+def cohere_config():
+    return PipelinePresets.rag_cohere("test-cohere")
+
+@pytest.fixture
 def mock_llm():
     return FakeMessagesListChatModel(
         responses=[
@@ -143,29 +170,19 @@ def mock_llm():
         ]
     )
 
-@pytest.fixture(autouse=True)
-def mock_get_llm(mocker,mock_llm):
-    mocker.patch("src.rag.steps.query_translation.get_llm",return_value=mock_llm)
-    mocker.patch("src.rag.steps.generation.get_llm",return_value=mock_llm)
 
 @pytest.fixture(autouse=True)
 def mock_get_embedding(mocker):
     embeddings = MagicMock()
     embeddings.embed_query.return_value = [0.1] * 768
-    mocker.patch("src.rag.core.get_embeddings",return_value=embeddings)
-    mocker.patch("src.rag.steps.retrieval.get_embeddings",return_value=embeddings)
+    mocker.patch("src.rag.core.GoogleGenerativeAIEmbeddings",return_value=embeddings)
 
-@pytest.fixture(autouse=True)
-def mock_get_client(mocker):
-    client = MagicMock()
-    client.collection_exists.return_value = True
-    mocker.patch("src.rag.ingest.get_client",return_value=client)
 
 @pytest.fixture(autouse=True)
 def mock_get_vectorstore(mocker,fake_docs):
     vectorstore = MagicMock()
     vectorstore.similarity_search_with_score.return_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
-    vectorstore.max_marginal_relevance_search_with_score_by_vector.retun_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
+    vectorstore.max_marginal_relevance_search_with_score_by_vector.return_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
     vectorstore.add_documents.return_value = MagicMock(return_value=None)
 
     mocker.patch("src.rag.ingest.get_vectorstore",return_value=vectorstore)
@@ -294,11 +311,24 @@ async def two_ready_pipelines(client: AsyncClient) -> tuple[dict, dict]:
 
 @pytest.fixture(autouse=True)
 def mock_minio_client(mocker):
+    id = uuid.uuid4()
     minio_client = MagicMock()
     minio_client.put_object = AsyncMock()
     minio_client.put_object.return_value = True
 
-    mocker.patch("src.api.routers.documents.get_minio_client",return_value=minio_client)
+    prefix = f"pipelines/{id}/"
+    obj1 = MagicMock()
+    obj1.object_name = f"{prefix}test file 1"
+    obj1.size = 1024 * 350
+    obj1.last_modified = datetime(2026, 3, 15, 10, 30)
+
+    obj2 = MagicMock()
+    obj2.object_name = f"{prefix}test file 2"
+    obj2.size = 1024 * 1200
+    obj2.last_modified = datetime(2026, 4, 1, 14, 15)
+    
+    minio_client.list_objects = AsyncMock(return_value=[obj1,obj2])
+    mocker.patch("src.storage.minio_client.Minio",return_value=minio_client)
 
     return minio_client
 
@@ -321,21 +351,14 @@ def mock_celery_task(mocker):
 
 @pytest.fixture(autouse=True)
 def mock_get_llm(mocker,mock_llm):
-    mocker.patch("src.rag.steps.query_translation.get_llm",return_value=mock_llm)
-    mocker.patch("src.rag.steps.generation.get_llm",return_value=mock_llm)
+    mocker.patch("src.rag.core.ChatGoogleGenerativeAI",return_value=mock_llm)
 
-@pytest.fixture(autouse=True)
-def mock_get_embedding(mocker):
-    embeddings = MagicMock()
-    embeddings.embed_query.return_value = [0.1] * 768
-    mocker.patch("src.rag.core.get_embeddings",return_value=embeddings)
-    mocker.patch("src.rag.steps.retrieval.get_embeddings",return_value=embeddings)
 
 @pytest.fixture(autouse=True)
 def mock_get_client(mocker):
     client = MagicMock()
     client.collection_exists.return_value = True
-    mocker.patch("src.rag.ingest.get_client",return_value=client)
+    mocker.patch("src.rag.core.QdrantClient",return_value=client)
 
 @pytest.fixture(autouse=True)
 def mock_get_vectorstore(mocker,fake_docs):
@@ -344,8 +367,7 @@ def mock_get_vectorstore(mocker,fake_docs):
     vectorstore.max_marginal_relevance_search_with_score_by_vector.return_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
     vectorstore.add_documents.return_value = MagicMock(return_value=None)
 
-    mocker.patch("src.rag.ingest.get_vectorstore",return_value=vectorstore)
-    mocker.patch("src.rag.steps.retrieval.get_vectorstore",return_value=vectorstore)
+    mocker.patch("src.rag.core.QdrantVectorStore",return_value=vectorstore)
 
 @pytest.fixture(autouse=True)
 def mock_get_parent_doc_retriever(mocker,fake_docs):
@@ -353,16 +375,22 @@ def mock_get_parent_doc_retriever(mocker,fake_docs):
     retriever.add_documents.return_value = MagicMock(return_value=None)
     retriever.ainvoke = AsyncMock()
     retriever.ainvoke.return_value = fake_docs
-    mocker.patch("src.rag.ingest.get_parent_doc_retriever", return_value=retriever)
-    mocker.patch("src.rag.steps.retrieval.get_parent_doc_retriever", return_value=retriever)
+    mocker.patch("src.rag.core.ParentDocumentRetriever", return_value=retriever)
+
+@pytest.fixture(autouse=True)
+def mock_redis_store(mocker):
+    redis = MagicMock()
+    mocker.patch("src.rag.core.RedisStore", return_value=redis)
 
 
 @pytest.fixture(autouse=True)
 def mock_get_splitter(mocker):
     splitter = MagicMock()
     splitter.split_documents.return_value = []
-    mocker.patch("src.rag.ingest.get_splitter", return_value=splitter)
-    mocker.patch("src.rag.core.get_splitter", return_value=splitter)
+    mocker.patch("src.rag.core.RecursiveCharacterTextSplitter", return_value=splitter)
+    mocker.patch("src.rag.core.CharacterTextSplitter", return_value=splitter)
+    mocker.patch("src.rag.core.SemanticChunker", return_value=splitter)
+
 
 @pytest.fixture(autouse=True)
 def mock_get_prompt(mocker):
@@ -443,3 +471,105 @@ def mock_celery_chord(mocker):
     )
 
     return mock_chord
+
+@pytest.fixture()
+async def benchmarks(client,dataset,two_ready_pipelines):
+    payload = {
+        "pipeline_ids":[p["id"] for p in two_ready_pipelines],
+        "dataset_id":dataset["id"]
+    }
+    response_1 = await client.post("/api/v1/benchmarks",json=payload)
+    response_2 = await client.post("/api/v1/benchmarks",json=payload)
+
+    return [response_1.json(),response_2.json()]
+
+@pytest.fixture()
+async def benchmark(client,dataset,two_ready_pipelines):
+    payload = {
+        "pipeline_ids":[p["id"] for p in two_ready_pipelines],
+        "dataset_id":dataset["id"]
+    }
+    response = await client.post("/api/v1/benchmarks",json=payload)
+
+    return response.json()
+
+@pytest.fixture()
+async def populated_benchmark(client,db_session,two_ready_pipelines):
+    pipeline_1,pipeline_2 = two_ready_pipelines
+    payload = {
+            "name":"test-dataset",
+            "description":"toy dataset for integration tests",
+            "items":[
+                {
+                "question": "What are the specific BLEU scores achieved by the Transformer model on the WMT 2014 English-to-German and English-to-French translation tasks?",
+                "ground_truth": "The Transformer model achieves a BLEU score of 28.4 on the WMT 2014 English-to-German translation task, improving over existing best results and ensembles by over 2 BLEU. On the WMT 2014 English-to-French translation task, it establishes a new single-model state-of-the-art BLEU score of 41.0."
+                }
+            ]
+        }
+    response = await client.post("/api/v1/datasets",json=payload)
+    data = response.json()
+    benchmark = BenchmarkModel(
+        id=str(uuid.uuid4()),
+        dataset_id=data["id"],
+        status="completed",
+        results = [
+            {
+                "pipeline_id":pipeline_1["id"],
+                "status":"complete",
+                "scores":{
+                    "faithfulness": 0.85,
+                    "answer_relevance": 0.92,
+                    "context_precision": 0.78,
+                    "context_recall": 0.88
+                }
+            },
+            {   "pipeline_id":pipeline_2["id"],
+                "status":"complete",
+                "scores":{
+                    "faithfulness": 0.90,
+                    "answer_relevance": 0.95,
+                    "context_precision": 0.82,
+                    "context_recall": 0.91
+                }
+            }
+        ],
+        error_log=None,
+        created_at=datetime.now(timezone.utc)
+    )
+    db_session.add(benchmark)
+    await db_session.flush()
+    
+    return BenchmarkResultResponse.model_validate(benchmark, from_attributes=True).model_dump()
+
+@pytest.fixture()
+async def pipeline_query_result(client,ready_pipeline):
+    response = await client.post(f"/api/v1/pipelines/{ready_pipeline["id"]}/query",json={"query":"what is attention"})
+    data = response.json()
+    return data
+
+@pytest.fixture()
+async def comparison_result(client,two_ready_pipelines):
+    pipeline_1 = two_ready_pipelines[0]
+    pipeline_2 = two_ready_pipelines[1]
+    payload = {
+        "pipeline_id1": pipeline_1["id"],
+        "pipeline_id2":pipeline_2["id"],
+        "query":"what is attention"
+    }
+    response = await client.post("/api/v1/compare",json=payload)
+    return response.json()
+
+@pytest.fixture()
+def mock_cohere_rerank_result(mocker,mock_cohere_rerank_response):
+    mock_native_client = MagicMock()
+    mock_native_client.rerank = MagicMock(return_value=mock_cohere_rerank_response)
+    
+    mock_instance = MagicMock()
+    mock_instance.client = mock_native_client
+
+    mocker.patch(
+        "src.rag.core.CohereRerank",
+        return_value=mock_instance
+    )
+    
+    return mock_instance    

@@ -190,3 +190,29 @@ class TestComparePipelines:
         assert result_1 is not None
         assert result_2 is not None
 
+class TestCompareStatus:
+    async def test_get_comparison_status_returns_200(self,client,comparison_result):
+        response = await client.get(f"/api/v1/compare/{comparison_result["id"]}")
+        assert response.status_code == 200
+
+    async def test_get_comparison_status_returns_correct_comparison_id(self, client,comparison_result):
+        response = await client.get(f"/api/v1/compare/{comparison_result["id"]}")
+        data = response.json()
+        assert data["id"] == comparison_result["id"]
+
+    async def test_get_comparison_status_returns_pending_before_eval_runs(self,client,comparison_result):
+        response = await client.get(f"/api/v1/compare/{comparison_result["id"]}")
+        data = response.json()
+        assert data["status"] == "pending"
+    
+    async def test_get_comparison_status_returns_query(self,client,comparison_result):
+        response = await client.get(f"/api/v1/compare/{comparison_result["id"]}")
+        data = response.json()
+        assert "query" in data
+        assert isinstance(data["query"],str)
+
+    async def test_get_nonexistent_comparison_returns_404(self, client):
+        id = uuid.uuid4()
+        response = await client.get(f"/api/v1/compare/{id}")
+        assert response.status_code == 404
+

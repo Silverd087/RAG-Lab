@@ -249,5 +249,18 @@ class TestUpdatePipeline:
 
 
 
+class TestGetPipelineStatus:
+    async def test_get_status_returns_200(self, client, pipeline):
+        response = await client.get(f"/api/v1/pipelines/{pipeline["id"]}/status")
+        assert response.status_code == 200
 
+    async def test_get_status_returns_correct_value(self, client, ready_pipeline):
+        response = await client.get(f"/api/v1/pipelines/{ready_pipeline["id"]}/status")
+        data = response.json()
+        assert data == "ready"
+
+    async def test_get_status_nonexistent_pipeline_returns_404(self, client):
+        id = uuid.uuid4()
+        response = await client.get(f"/api/v1/pipelines/{id}/status")
+        assert response.status_code == 404
 

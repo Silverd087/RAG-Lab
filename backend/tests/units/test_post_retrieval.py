@@ -104,6 +104,26 @@ class TestPostRetrieval:
         )
         assert "reorder_applied" not in trace
 
+    async def test_cohere_reranker_adds_reranked_chunks_to_trace(self,cohere_config,fake_docs,mock_cohere_rerank_result):
+        
+        docs, trace = await post_retrieval(
+            config=cohere_config,
+            trace={"retrieval": {}, "translation": {}},
+            query= "what is attention",
+            docs=fake_docs
+        )
+        assert "reranked_chunks" in trace
+        assert len(docs) <= cohere_config.post_retrieval.top_n
+
+    async def test_cohere_reranker_scores_stored_in_metadata(self,cohere_config,fake_docs,mock_cohere_rerank_result):
+        docs, _ = await post_retrieval(
+            config=cohere_config,
+            trace={"retrieval": {}, "translation": {}},
+            query= "what is attention",
+            docs=fake_docs
+        )
+        assert all("rerank_score" in doc.metadata for doc in docs)
+
 class TestRRFScore:
 
     def test_returns_list_of_documents(self,fake_docs):
@@ -147,3 +167,4 @@ class TestReorder:
     def test_empty_list_returns_empty(self):
         docs = _reorder([])
         assert len(docs) == 0
+

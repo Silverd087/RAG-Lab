@@ -114,3 +114,22 @@ class TestQueryHistory:
 
 
 
+class TestGetPipelineResult:
+    async def test_get_result_returns_200(self, client, ready_pipeline,pipeline_query_result):
+        response = await client.get(f"/api/v1/pipelines/{ready_pipeline["id"]}/results/{pipeline_query_result["id"]}")
+        assert response.status_code == 200
+
+    async def test_get_result_returns_correct_id(self, client, ready_pipeline,pipeline_query_result):
+        response = await client.get(f"/api/v1/pipelines/{ready_pipeline["id"]}/results/{pipeline_query_result["id"]}")
+        data_b = response.json()
+        assert pipeline_query_result["id"] == data_b["id"]
+
+    async def test_get_result_returns_correct_pipeline_id(self, client, ready_pipeline,pipeline_query_result):
+        response = await client.get(f"/api/v1/pipelines/{ready_pipeline["id"]}/results/{pipeline_query_result["id"]}")
+        data_b = response.json()
+        assert data_b["pipeline_id"] == ready_pipeline["id"]
+
+    async def test_get_nonexistent_result_returns_404(self, client, ready_pipeline):
+        id = uuid.uuid4()
+        response = await client.get(f"/api/v1/pipelines/{ready_pipeline["id"]}/results/{id}")
+        assert response.status_code == 404

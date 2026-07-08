@@ -6,6 +6,7 @@ import pytest
 import uuid
 from datetime import datetime
 import json
+
 class TestChunkingConfig:
     def test_default_values(self):
         config = ChunkingConfig()
@@ -41,6 +42,10 @@ class TestPostRetrievalConfig:
     def test_cross_encoder_requires_top_n(self):
         with pytest.raises(ValueError,match="top_n"):
             PostRetrievalConfig(reranker=RerankerConfig.CROSS_ENCODER,top_n=None)
+
+    def test_cross_encoder_requires_model(self):
+        with pytest.raises(ValueError,match="cross encoder model field is required"):
+            PostRetrievalConfig(reranker=RerankerConfig.CROSS_ENCODER,top_n=5,cross_encoder_model=None)        
 
     def test_cross_encoder_top_n_must_be_positive(self):
         with pytest.raises(ValueError,match="top_n"):

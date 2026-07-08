@@ -4,7 +4,7 @@ from src.rag.models import (PipelineResult,PipelineStatus,QueryTranslationConfig
 from typing import Optional
 from datetime import datetime
 class CompareResponse(BaseModel):
-    comparison_id:UUID4
+    id:UUID4
     result1:PipelineResult
     result2:PipelineResult
 
@@ -121,7 +121,7 @@ class PipelineScores(BaseModel):
     error:Optional[str] = None
 
 class BenchmarkResultResponse(BaseModel):
-    benchmark_id: UUID4
+    id: UUID4
     dataset_id: UUID4
     status:str
     created_at: datetime
@@ -132,12 +132,12 @@ class BenchmarkListResponse(BaseModel):
     benchmarks:list[BenchmarkResultResponse]
 
 class CompareStatusResponse(BaseModel):
-    comparison_id:UUID4
+    id:UUID4
     status:str = "pending"
     query:str
-    result_1:str
-    result_2:str
-    evaluation_scores:dict
+    result_1:UUID4
+    result_2:UUID4
+    evaluation_scores:Optional[dict]
 
 class DatasetUpdateQuery(BaseModel):
     name:Optional[str] = None
