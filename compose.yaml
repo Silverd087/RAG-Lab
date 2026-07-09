@@ -1,0 +1,233 @@
+# Comments are provided throughout this file to help you get started.
+# If you need more help, visit the Docker Compose reference guide at
+# https://docs.docker.com/go/compose-spec-reference/
+
+# Here the instructions define your application as a service called "server".
+# This service is built from the Dockerfile in the current directory.
+# You can add other services your application may depend on here, such as a
+# database or a cache. For examples, see the Awesome Compose repository:
+# https://github.com/docker/awesome-compose
+services:
+  rag-service:
+    depends_on: 
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    networks:
+      - rag network
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000
+
+  ingestion-service:
+    depends_on: 
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    networks:
+      - rag-network
+    command: celery -A src.celery_app worker --queues ingestion --concurrency 2
+
+  evaluation-service:
+    depends_on: 
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    networks:
+      - rag-network
+    command: celery -A src.celery_app worker --queues evaluation --concurrency 1
+
+  frontend:
+    depends_on: 
+      rag-service:
+        condition: service_started
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    networks:
+      - rag-network
+
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: always
+    user: postgres
+    secrets:
+      - db_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=RagLab
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+    expose:
+      - 5432
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "RagLab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+  minio: 
+    image: quay.io/minio/minio:RELEASE.2024-01-01T00-00-00Z
+    container_name: minio
+    restart: unless-stopped
+    ports:
+    - "9000:9000"
+    - "9001:9001"
+    env_file:
+      - .env
+    volumes:
+      - minio-data:/data/minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEYS}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEYS}
+    networks:
+      - rag-network
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  qdrant:
+    image: qdrant/qdrant:v1.9.0
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333" 
+      - "6334:6334"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+      - ./config:/qdrant/config
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: secure_password
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 15s
+      retries: 5
+
+volumes:
+  db_data:
+  redis-data:
+  minio-data:
+  rabbitmq_data:
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+networks:
+  rag-network:
+    driver: bridge
+
+
+
+# The commented out section below is an example of how to define a PostgreSQL
+# database that your application can use. `depends_on` tells Docker Compose to
+# start the database before your application. The `db-data` volume persists the
+# database data between container restarts. The `db-password` secret is used
+# to set the database password. You must create `db/password.txt` and add
+# a password of your choosing to it before running `docker compose up`.
+#     depends_on:
+#       db:
+#         condition: service_healthy
+#   db:
+#     image: postgres
+#     restart: always
+#     user: postgres
+#     secrets:
+#       - db-password
+#     volumes:
+#       - db-data:/var/lib/postgresql/data
+#     environment:
+#       - POSTGRES_DB=example
+#       - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+#     expose:
+#       - 5432
+#     healthcheck:
+#       test: [ "CMD", "pg_isready" ]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+# volumes:
+#   db-data:
+# secrets:
+#   db-password:
+#     file: db/password.txt
+

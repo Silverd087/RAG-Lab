@@ -95,18 +95,10 @@ def fake_docs()->list[Document]:
 
 @pytest.fixture
 def mock_cohere_rerank_response():
-    result_1 = MagicMock()
-    result_1.index = 0
-    result_1.relevance_score = 0.99
-    result_1.page_content = "Chunk 1"
-    result_1.metadata = {"source": "test.pdf", "page": 2, "score": 0.81}
-
-    result_2 = MagicMock()
-    result_2.index = 1
-    result_2.relevance_score = 0.85
-    result_2.page_content = "Chunk 2"
-    result_2.metadata = {"source": "test.pdf", "page": 1, "score": 0.88}
-    return [result_1, result_2]
+  return [
+        {"index": 0, "relevance_score": 0.99},
+        {"index": 1, "relevance_score": 0.85},
+    ]
 
 @pytest.fixture
 def duplicate_docs(fake_docs)->list[Document]:
@@ -179,33 +171,6 @@ def mock_get_embedding(mocker):
 
 
 @pytest.fixture(autouse=True)
-def mock_get_vectorstore(mocker,fake_docs):
-    vectorstore = MagicMock()
-    vectorstore.similarity_search_with_score.return_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
-    vectorstore.max_marginal_relevance_search_with_score_by_vector.return_value = [(doc,doc.metadata["score"]) for doc in fake_docs]
-    vectorstore.add_documents.return_value = MagicMock(return_value=None)
-
-    mocker.patch("src.rag.ingest.get_vectorstore",return_value=vectorstore)
-    mocker.patch("src.rag.steps.retrieval.get_vectorstore",return_value=vectorstore)
-
-@pytest.fixture(autouse=True)
-def mock_get_parent_doc_retriever(mocker,fake_docs):
-    retriever = MagicMock()
-    retriever.add_documents.return_value = MagicMock(return_value=None)
-    retriever.ainvoke = AsyncMock()
-    retriever.ainvoke.return_value = fake_docs
-    mocker.patch("src.rag.ingest.get_parent_doc_retriever", return_value=retriever)
-    mocker.patch("src.rag.steps.retrieval.get_parent_doc_retriever", return_value=retriever)
-
-
-@pytest.fixture(autouse=True)
-def mock_get_splitter(mocker):
-    splitter = MagicMock()
-    splitter.split_documents.return_value = []
-    mocker.patch("src.rag.ingest.get_splitter", return_value=splitter)
-    mocker.patch("src.rag.core.get_splitter", return_value=splitter)
-
-@pytest.fixture(autouse=True)
 def mock_get_prompt(mocker):
     prompt = ChatPromptTemplate.from_template("Context: {context}\nQuestion: {question}")
     mocker.patch("src.rag.steps.generation.get_prompt", return_value=prompt)
@@ -215,7 +180,8 @@ def mock_get_prompt(mocker):
 def mock_cross_encoder(mocker):
     cross_encoder = MagicMock()
     cross_encoder.score.return_value = [0.9,0.8,0.7]
-    mocker.patch("src.rag.steps.post_retrieval.get_cross_encoder",return_value=cross_encoder)
+    mocker.patch("src.rag.core.HuggingFaceCrossEncoder",return_value=cross_encoder)
+    return cross_encoder
 
 @pytest_asyncio.fixture
 async def pipeline(db_session):
@@ -329,6 +295,7 @@ def mock_minio_client(mocker):
     
     minio_client.list_objects = AsyncMock(return_value=[obj1,obj2])
     mocker.patch("src.storage.minio_client.Minio",return_value=minio_client)
+    mocker.patch("src.storage.minio_client._minio_client", None)
 
     return minio_client
 
@@ -358,7 +325,17 @@ def mock_get_llm(mocker,mock_llm):
 def mock_get_client(mocker):
     client = MagicMock()
     client.collection_exists.return_value = True
+    client.create_collection.return_value = True
     mocker.patch("src.rag.core.QdrantClient",return_value=client)
+    mocker.patch("src.rag.core._client", None)
+    return client
+
+@pytest.fixture(autouse=True)
+def mock_document_loader(mocker,fake_docs):
+    document_loader = MagicMock()
+    document_loader.load.return_value = fake_docs
+    mocker.patch("src.rag.ingest.UnstructuredLoader", return_value=document_loader)
+    return document_loader
 
 @pytest.fixture(autouse=True)
 def mock_get_vectorstore(mocker,fake_docs):
@@ -368,6 +345,7 @@ def mock_get_vectorstore(mocker,fake_docs):
     vectorstore.add_documents.return_value = MagicMock(return_value=None)
 
     mocker.patch("src.rag.core.QdrantVectorStore",return_value=vectorstore)
+    return vectorstore
 
 @pytest.fixture(autouse=True)
 def mock_get_parent_doc_retriever(mocker,fake_docs):
@@ -376,6 +354,7 @@ def mock_get_parent_doc_retriever(mocker,fake_docs):
     retriever.ainvoke = AsyncMock()
     retriever.ainvoke.return_value = fake_docs
     mocker.patch("src.rag.core.ParentDocumentRetriever", return_value=retriever)
+    return retriever
 
 @pytest.fixture(autouse=True)
 def mock_redis_store(mocker):
@@ -390,19 +369,8 @@ def mock_get_splitter(mocker):
     mocker.patch("src.rag.core.RecursiveCharacterTextSplitter", return_value=splitter)
     mocker.patch("src.rag.core.CharacterTextSplitter", return_value=splitter)
     mocker.patch("src.rag.core.SemanticChunker", return_value=splitter)
+    return splitter
 
-
-@pytest.fixture(autouse=True)
-def mock_get_prompt(mocker):
-    prompt = ChatPromptTemplate.from_template("Context: {context}\nQuestion: {question}")
-    mocker.patch("src.rag.steps.generation.get_prompt", return_value=prompt)
-
-
-@pytest.fixture(autouse=True)
-def mock_cross_encoder(mocker):
-    cross_encoder = MagicMock()
-    cross_encoder.score.return_value = [0.9,0.8,0.7]
-    mocker.patch("src.rag.steps.post_retrieval.get_cross_encoder",return_value=cross_encoder)
 
 @pytest_asyncio.fixture
 async def dataset(client):
@@ -561,15 +529,8 @@ async def comparison_result(client,two_ready_pipelines):
 
 @pytest.fixture()
 def mock_cohere_rerank_result(mocker,mock_cohere_rerank_response):
-    mock_native_client = MagicMock()
-    mock_native_client.rerank = MagicMock(return_value=mock_cohere_rerank_response)
-    
     mock_instance = MagicMock()
-    mock_instance.client = mock_native_client
-
-    mocker.patch(
-        "src.rag.core.CohereRerank",
-        return_value=mock_instance
-    )
-    
-    return mock_instance    
+    mock_instance.rerank.return_value = mock_cohere_rerank_response
+    mocker.patch.dict("src.rag.core._cohere_rerank", clear=True)
+    mocker.patch("src.rag.core.CohereRerank", return_value=mock_instance)
+    return mock_instance  

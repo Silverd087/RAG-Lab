@@ -47,7 +47,7 @@ def get_cross_encoder(config:PipelineConfig)->HuggingFaceCrossEncoder:
 def get_cohere_rerank(config:PipelineConfig)->CohereRerank:
     model = config.post_retrieval.cohere_model
     if model not in _cohere_rerank:
-        _cohere_rerank[model] = CohereRerank(model=model)
+        _cohere_rerank[model] = CohereRerank(model=model,cohere_api_key=settings.cohere_api_key)
     return _cohere_rerank[model]
 
 def get_client()->QdrantClient:

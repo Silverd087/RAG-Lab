@@ -12,6 +12,7 @@ import { api } from '../../lib/api';
 import { useToast } from '../../components/Toast';
 import type {
   ChunkingStrategy,
+  Provider,
   RetrievalMode,
   RerankerConfig,
   VectorDb,
@@ -31,6 +32,21 @@ const STEP_META = [
 
 const DEFAULT_PROMPT = 'Answer the question using only the context below.\n\nContext:\n{context}\n\nQuestion: {question}';
 
+const PROVIDER_LABELS: Record<Provider, string> = {
+  google: 'Google',
+  anthropic: 'Anthropic',
+};
+
+const EMBEDDING_MODELS: Record<Provider, string[]> = {
+  google: ['gemini-embedding-001', 'text-embedding-004'],
+  anthropic: ['voyage-3-large', 'voyage-3.5'],
+};
+
+const LLM_MODELS: Record<Provider, string[]> = {
+  google: ['gemini-2.5-flash', 'gemini-2.5-pro'],
+  anthropic: ['claude-sonnet-5', 'claude-haiku-4-5-20251001', 'claude-opus-4-8'],
+};
+
 export function PipelineBuilder() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -44,6 +60,7 @@ export function PipelineBuilder() {
   const [parentDoc, setParentDoc] = useState(false);
 
   const [vectorDb, setVectorDb] = useState<VectorDb>('qdrant');
+  const [indexingProvider, setIndexingProvider] = useState<Provider>('google');
   const [embeddingModel, setEmbeddingModel] = useState('gemini-embedding-001');
 
   const [multiQuery, setMultiQuery] = useState(false);
@@ -57,8 +74,19 @@ export function PipelineBuilder() {
   const [topN, setTopN] = useState(5);
   const [reorder, setReorder] = useState(false);
 
+  const [generationProvider, setGenerationProvider] = useState<Provider>('google');
   const [llm, setLlm] = useState('gemini-2.5-flash');
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
+
+  const changeIndexingProvider = (p: Provider) => {
+    setIndexingProvider(p);
+    setEmbeddingModel(EMBEDDING_MODELS[p][0]);
+  };
+
+  const changeGenerationProvider = (p: Provider) => {
+    setGenerationProvider(p);
+    setLlm(LLM_MODELS[p][0]);
+  };
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -70,7 +98,7 @@ export function PipelineBuilder() {
           overlap,
           parent_doc: parentDoc,
         },
-        indexing: { vector_db: vectorDb, embedding_model: embeddingModel },
+        indexing: { vector_db: vectorDb, provider: indexingProvider, embedding_model: embeddingModel },
         query_translation: { multi_query: multiQuery, hyde, step_back: stepBack },
         retrieval: { mode, top_k: topK },
         post_retrieval: {
@@ -78,7 +106,7 @@ export function PipelineBuilder() {
           top_n: reranker === 'none' ? null : topN,
           reorder,
         },
-        generation: { llm, prompt: { prompt } },
+        generation: { llm, provider: generationProvider, prompt: { prompt } },
       }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['pipelines'] });
@@ -164,12 +192,17 @@ export function PipelineBuilder() {
                     <option value="chroma">Chroma</option>
                   </Select>
                 </Field>
+                <Field label="Provider">
+                  <Select value={indexingProvider} onChange={(e) => changeIndexingProvider(e.target.value as Provider)}>
+                    <option value="google">Google</option>
+                    <option value="anthropic">Anthropic</option>
+                  </Select>
+                </Field>
                 <Field label="Embedding model">
                   <Select value={embeddingModel} onChange={(e) => setEmbeddingModel(e.target.value)}>
-                    <option value="gemini-embedding-001">gemini-embedding-001</option>
-                    <option value="text-embedding-3-large">text-embedding-3-large</option>
-                    <option value="text-embedding-3-small">text-embedding-3-small</option>
-                    <option value="cohere-embed-v3">cohere-embed-v3</option>
+                    {EMBEDDING_MODELS[indexingProvider].map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
                   </Select>
                 </Field>
               </>
@@ -220,12 +253,17 @@ export function PipelineBuilder() {
 
             {step === 6 && (
               <>
+                <Field label="Provider">
+                  <Select value={generationProvider} onChange={(e) => changeGenerationProvider(e.target.value as Provider)}>
+                    <option value="google">Google</option>
+                    <option value="anthropic">Anthropic</option>
+                  </Select>
+                </Field>
                 <Field label="LLM">
                   <Select value={llm} onChange={(e) => setLlm(e.target.value)}>
-                    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                    <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                    <option value="gpt-4o">gpt-4o</option>
-                    <option value="gpt-4o-mini">gpt-4o-mini</option>
+                    {LLM_MODELS[generationProvider].map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
                   </Select>
                 </Field>
                 <Field label="Prompt template" hint="Use {context} and {question} placeholders.">
@@ -239,14 +277,14 @@ export function PipelineBuilder() {
                 {[
                   ['Name', name],
                   ['Chunking', `${chunkStrategy} · ${chunkSize}/${overlap}${parentDoc ? ' · parent-doc' : ''}`],
-                  ['Indexing', `${vectorDb} · ${embeddingModel}`],
+                  ['Indexing', `${vectorDb} · ${PROVIDER_LABELS[indexingProvider]} · ${embeddingModel}`],
                   [
                     'Query translation',
                     [multiQuery && 'multi-query', hyde && 'HyDE', stepBack && 'step-back'].filter(Boolean).join(', ') || 'none',
                   ],
                   ['Retrieval', `${mode} · top-${topK}`],
                   ['Post-retrieval', `${reranker}${reranker !== 'none' ? ` · top-${topN}` : ''}${reorder ? ' · reorder' : ''}`],
-                  ['Generation', llm],
+                  ['Generation', `${PROVIDER_LABELS[generationProvider]} · ${llm}`],
                 ].map(([k, v]) => (
                   <div key={k} className={styles.reviewRow}>
                     <span className={styles.reviewKey}>{k}</span>

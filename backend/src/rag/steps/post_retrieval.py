@@ -39,8 +39,8 @@ def _cohere_rerank(config:PipelineConfig,docs:list[Document],query:str)->tuple[l
     result_docs = []
     result_scores = []
     for r in reranked:
-        doc = docs[r.index]
-        score = r.relevance_score
+        doc = docs[r["index"]]
+        score = r["relevance_score"]
         doc.metadata["rerank_score"] = float(score)
         result_docs.append(doc)
         result_scores.append({

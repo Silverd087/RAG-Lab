@@ -63,7 +63,7 @@ class TestPostRetrieval:
         )
         assert all("rerank_score" in doc.metadata for doc in docs)
     
-    async def test_rrf_applied_when_raw_results_present(slef,fusion_config,fake_docs):
+    async def test_rrf_applied_when_raw_results_present(self,fusion_config,fake_docs):
         raw_results = [fake_docs[:2], fake_docs[1:]]
         docs, trace = await post_retrieval(
             config=fusion_config,
@@ -113,7 +113,7 @@ class TestPostRetrieval:
             docs=fake_docs
         )
         assert "reranked_chunks" in trace
-        assert len(docs) <= cohere_config.post_retrieval.top_n
+        assert len(docs) == cohere_config.post_retrieval.top_n
 
     async def test_cohere_reranker_scores_stored_in_metadata(self,cohere_config,fake_docs,mock_cohere_rerank_result):
         docs, _ = await post_retrieval(

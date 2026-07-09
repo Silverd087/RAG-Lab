@@ -87,7 +87,7 @@ class PostRetrievalConfig(BaseModel):
             raise ValueError("top_n field is required to be an integer greater than 0")
         if self.reranker == RerankerConfig.CROSS_ENCODER and self.cross_encoder_model is None:
             raise ValueError("cross encoder model field is required")
-        if self.reranker == RerankerConfig.COHERE and self.cohere_model is None:
+        if self.reranker == RerankerConfig.COHERE and (self.top_n is None or self.top_n<0):
             raise ValueError("cohere model field is required")
         return self
 

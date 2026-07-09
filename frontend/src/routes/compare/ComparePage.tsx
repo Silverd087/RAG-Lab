@@ -46,8 +46,8 @@ export function ComparePage() {
   });
 
   const statusQuery = useQuery({
-    queryKey: ['compare-status', result?.comparison_id],
-    queryFn: () => api.getCompareStatus(result!.comparison_id),
+    queryKey: ['compare-status', result?.id],
+    queryFn: () => api.getCompareStatus(result!.id),
     enabled: !!result,
     refetchInterval: (query) => (query.state.data?.status === 'completed' ? false : 1500),
   });

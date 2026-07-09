@@ -45,9 +45,11 @@ async def build_benchmark_dataset(golden_set:list,config:PipelineConfig):
                         context=[c.content for c in result.chunks])
         
         test_cases.append(test_case)
-    return EvaluationDataset(test_cases)
+    dataset = EvaluationDataset()
+    dataset.test_cases = test_cases
+    return dataset
 
-@shared_task
+@shared_task(queue="ingestion")
 def ingest_task(config_dict:dict,object_name:str)->None:
     pipeline_config = PipelineConfig.model_validate(config_dict)
     minio_client = get_minio_client()
@@ -81,7 +83,7 @@ def ingest_task(config_dict:dict,object_name:str)->None:
             os.unlink(tmp_path)
 
 
-@shared_task
+@shared_task(queue="evaluation")
 def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:dict,config_2_dict:dict):
 
     with get_sync_db() as db:
@@ -112,7 +114,8 @@ def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:
                                     context=[chunk.content for chunk in p.chunks])
             test_cases.append(test_case)
 
-        dataset = EvaluationDataset(test_cases)
+        dataset = EvaluationDataset()
+        dataset.test_cases = test_cases
 
         config1 = PipelineConfig.model_validate(config_1_dict)
         config2 = PipelineConfig.model_validate(config_2_dict)
@@ -125,7 +128,7 @@ def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:
             ContextualRecallMetric(threshold=0.7, model=eval_model)
         ]
 
-        results = evaluate(test_cases=dataset,metrics=metrics)
+        results = evaluate(test_cases=dataset.test_cases,metrics=metrics)
 
         scores = []
         for test_case_result in results.test_results:
@@ -150,7 +153,7 @@ def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:
            comparison_id_row.status = "completed"
 
 
-@shared_task
+@shared_task(queue="evaluation")
 def evaluate_single_pipeline(pipeline_id:str,dataset_id:str):
     try:
         with get_sync_db() as db:
@@ -179,7 +182,7 @@ def evaluate_single_pipeline(pipeline_id:str,dataset_id:str):
             ContextualRecallMetric(threshold=0.7, model=eval_model)
         ]
 
-        result = evaluate(test_cases=dataset,metrics=metrics)
+        result = evaluate(test_cases=dataset.test_cases,metrics=metrics)
 
         total_faithfulness = 0.0
         total_relevance = 0.0
@@ -213,7 +216,7 @@ def evaluate_single_pipeline(pipeline_id:str,dataset_id:str):
             error=str(e)
         ).model_dump(mode="json")
 
-@shared_task
+@shared_task(queue="evaluation")
 def aggregate_benchmark_results(results:list[dict],benchmark_id:str):
     successes = [r for r in results if r["status"] == "success"]
     failures = [r for r in results if r["status"] == "failed"]
@@ -233,7 +236,7 @@ def aggregate_benchmark_results(results:list[dict],benchmark_id:str):
             benchmark_row.status = "completed"
 
         response = BenchmarkResultResponse(
-            benchmark_id=benchmark_id,
+            id=benchmark_id,
             dataset_id=benchmark_row.dataset_id,
             status=benchmark_row.status,
             created_at=benchmark_row.created_at,

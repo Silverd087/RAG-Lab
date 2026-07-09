@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings,SettingsConfigDict
 class Settings(BaseSettings):
     qdrant_url:str = "http://localhost:6333"
     redis_url: str = "redis://localhost:6379"
+    rabbitmq_url:str = "amqp://guest:guest@rabbitmq:5672//"
     google_api_key:str
     cohere_api_key:str
     postgres_user:str

@@ -16,8 +16,6 @@ def ensure_collection(config:PipelineConfig):
 
 
 def run_ingest(file : str, config : PipelineConfig) -> None:    
-    if not file.endswith(".pdf"):
-        raise ValueError(f"Expected a pdf file, got {file}")
     ensure_collection(config)
     loader = UnstructuredLoader(file)
     docs = loader.load()

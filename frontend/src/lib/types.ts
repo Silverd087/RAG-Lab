@@ -13,8 +13,11 @@ export interface ChunkingConfig {
 
 export type VectorDb = 'qdrant' | 'chroma';
 
+export type Provider = 'google' | 'anthropic';
+
 export interface IndexingConfig {
   vector_db: VectorDb;
+  provider: Provider;
   embedding_model: string;
 }
 
@@ -49,6 +52,7 @@ export interface Prompt {
 
 export interface GenerationConfig {
   llm: string;
+  provider: Provider;
   streaming: boolean;
   prompt: Prompt | null;
 }
@@ -113,13 +117,13 @@ export interface DeepEvalScores {
 }
 
 export interface CompareResponse {
-  comparison_id: string;
+  id: string;
   result1: PipelineResult;
   result2: PipelineResult;
 }
 
 export interface CompareStatusResponse {
-  comparison_id: string;
+  id: string;
   status: string;
   query: string;
   result_1: string;

@@ -2648,6 +2648,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pika"
+version = "1.4.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f7/09/8c42dd00c4b3e09ebd174455d30823c261eefef9d2b7e94ae9ca779704c1/pika-1.4.1.tar.gz", hash = "sha256:e851f3e4992adfbf8eb64e9b86d94e3382f92ba0200055abedbb29676b8e713b", size = 154268, upload-time = "2026-05-22T18:01:24.855Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7f/7b/a09c0d378ee8604220902c58103104b2304ef99744c4b7fc45312d280484/pika-1.4.1-py3-none-any.whl", hash = "sha256:2daae7bd422a0fc4f4879fd48c9a1932ed74a0bc7172e1e5f9bde63a101ed074", size = 164962, upload-time = "2026-05-22T18:01:23.429Z" },
+]
+
+[[package]]
 name = "pillow"
 version = "12.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3384,6 +3393,7 @@ dependencies = [
     { name = "langchain-voyageai" },
     { name = "langsmith" },
     { name = "minio" },
+    { name = "pika" },
     { name = "psycopg2-binary" },
     { name = "pypdf" },
     { name = "pytest-cov" },
@@ -3427,6 +3437,7 @@ requires-dist = [
     { name = "langchain-voyageai", specifier = ">=0.4.0" },
     { name = "langsmith", specifier = ">=0.8.9" },
     { name = "minio", specifier = ">=7.2.20" },
+    { name = "pika", specifier = ">=1.4.1" },
     { name = "psycopg2-binary", specifier = ">=2.9.12" },
     { name = "pypdf", specifier = ">=6.13.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
