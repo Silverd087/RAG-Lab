@@ -17,7 +17,7 @@ WORKDIR /app
 
 COPY --from=builder /usr/src/app/dist ./
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/nginx.conf
 
 USER nginx
 

@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings,SettingsConfigDict
 class Settings(BaseSettings):
     qdrant_url:str = "http://localhost:6333"
     redis_url: str = "redis://localhost:6379"
-    rabbitmq_url:str = "amqp://guest:guest@rabbitmq:5672//"
+    rabbitmq_url:str = "amqp://guest:guest@localhost:5672//"
     google_api_key:str
     cohere_api_key:str
     postgres_user:str
@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     postgres_host:str
     postgres_db:str
     postgres_test_db:str
-    minio_port:int
+    minio_endpoint:str = "localhost:9000"
     minio_access_keys:str
     minio_secret_keys:str
     minio_bucket_name:str
