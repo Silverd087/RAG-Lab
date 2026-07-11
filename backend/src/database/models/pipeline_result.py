@@ -1,7 +1,8 @@
 from __future__ import annotations
 from src.database.models.base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Text,ForeignKey
+from sqlalchemy import Text,ForeignKey,DateTime
+from datetime import datetime,timezone
 import uuid
 from sqlalchemy.dialects.postgresql import UUID,JSONB
 from typing import List, TYPE_CHECKING
@@ -19,6 +20,17 @@ class PipelineResultModel(Base):
         ForeignKey("pipeline_config.id",ondelete="CASCADE"),
         nullable=False,
         index=True,
+    )
+
+    session_id:Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+    )
+    created_at:Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
 
     query:Mapped[str] = mapped_column(Text,nullable=False)

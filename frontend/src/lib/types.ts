@@ -13,7 +13,7 @@ export interface ChunkingConfig {
 
 export type VectorDb = 'qdrant' | 'chroma';
 
-export type Provider = 'google' | 'anthropic';
+export type Provider = 'google' | 'anthropic' | 'huggingface';
 
 export interface IndexingConfig {
   vector_db: VectorDb;
@@ -96,6 +96,8 @@ export interface ChunkTrace {
 export interface PipelineResult {
   id: string | null;
   pipeline_id: string;
+  session_id: string | null;
+  created_at: string | null;
   query: string;
   query_variants: string[] | null;
   translated_query: string | null;

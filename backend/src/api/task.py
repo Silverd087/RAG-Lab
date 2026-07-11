@@ -68,7 +68,7 @@ def ingest_task(config_dict:dict,object_name:str)->None:
             tmp.write(response.read())
             tmp_path = tmp.name
         
-        run_ingest(tmp_path,pipeline_config)
+        run_ingest(tmp_path,pipeline_config,source_name=object_name.rsplit("/",1)[-1])
 
         with get_sync_db() as db:
             update_pipeline_status(db,pipeline_config.id,status="ready")

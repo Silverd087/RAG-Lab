@@ -1,0 +1,330 @@
+warning: in the working copy of 'compose.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/Dockerfile', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/lib/api.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/lib/types.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/routes/pipelines/PipelineBuilder.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/routes/query/QueryPlayground.tsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/backend/src/api/routers/query.py b/backend/src/api/routers/query.py[m
+[1mindex 089c042..c21c9cf 100644[m
+[1m--- a/backend/src/api/routers/query.py[m
+[1m+++ b/backend/src/api/routers/query.py[m
+[36m@@ -4,6 +4,7 @@[m [mfrom src.rag.models import PipelineConfig,PipelineResult,ChunkTrace[m
+ from src.database.session import get_db[m
+ from sqlalchemy.ext.asyncio import AsyncSession[m
+ from sqlalchemy import select[m
+[32m+[m[32mfrom sqlalchemy.orm import selectinload[m
+ from src.database.models.pipeline import PipelineModel,PipelineStatusEnum[m
+ from src.database.models.pipeline_result import PipelineResultModel[m
+ from src.database.models.chunk_trace import ChunkTraceModel[m
+[36m@@ -40,6 +41,7 @@[m [masync def query_pipeline(id:uuid.UUID,payload:QueryRequest,db:AsyncSession = Dep[m
+ [m
+     result = PipelineResultModel([m
+         pipeline_id = id,[m
+[32m+[m[32m        session_id = payload.session_id,[m
+         query = query,[m
+         translated_query = pipeline_result.translated_query,[m
+         query_variants = pipeline_result.query_variants,[m
+[36m@@ -55,23 +57,31 @@[m [masync def query_pipeline(id:uuid.UUID,payload:QueryRequest,db:AsyncSession = Dep[m
+ [m
+     db.add(result)[m
+     await db.flush()[m
+[31m-    updated_result = pipeline_result.model_copy(update={"id": result.id})[m
+[32m+[m[32m    updated_result = pipeline_result.model_copy(update={[m
+[32m+[m[32m        "id": result.id,[m
+[32m+[m[32m        "session_id": result.session_id,[m
+[32m+[m[32m        "created_at": result.created_at,[m
+[32m+[m[32m    })[m
+     return updated_result[m
+ [m
+ @router.get("/pipelines/{id}/results",status_code=status.HTTP_200_OK,response_model=list[PipelineResult])[m
+ async def get_pipeline_history(id:uuid.UUID,db:AsyncSession = Depends(get_db)):[m
+     [m
+[31m-    stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == id)[m
+[32m+[m[32m    stmt = ([m
+[32m+[m[32m        select(PipelineResultModel)[m
+[32m+[m[32m        .where(PipelineResultModel.pipeline_id == id)[m
+[32m+[m[32m        .options(selectinload(PipelineResultModel.chunks))[m
+[32m+[m[32m        .order_by(PipelineResultModel.created_at)[m
+[32m+[m[32m    )[m
+     result = await db.execute(stmt)[m
+ [m
+     pipeline_rows = result.scalars().all()[m
+ [m
+[31m-    if not pipeline_rows:[m
+[31m-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f'No Pipeline results with id {id} were found')[m
+[31m-[m
+     return [PipelineResult([m
+         id=pipeline_row.id,[m
+         pipeline_id=pipeline_row.pipeline_id,[m
+[32m+[m[32m        session_id=pipeline_row.session_id,[m
+[32m+[m[32m        created_at=pipeline_row.created_at,[m
+         query=pipeline_row.query,[m
+         query_variants=pipeline_row.query_variants,[m
+         translated_query=pipeline_row.translated_query,[m
+[36m@@ -88,7 +98,7 @@[m [masync def get_pipeline_history(id:uuid.UUID,db:AsyncSession = Depends(get_db)):[m
+ @router.get("/pipelines/{id}/results/{result_id}",status_code=status.HTTP_200_OK,response_model=PipelineResult)[m
+ async def get_pipeline_result(id:uuid.UUID,result_id:uuid.UUID,db:AsyncSession=Depends(get_db)):[m
+     [m
+[31m-    stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == id and PipelineResultModel.id == result_id)[m
+[32m+[m[32m    stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == id, PipelineResultModel.id == result_id).options(selectinload(PipelineResultModel.chunks))[m
+ [m
+     result = await db.execute(stmt)[m
+ [m
+[36m@@ -100,6 +110,8 @@[m [masync def get_pipeline_result(id:uuid.UUID,result_id:uuid.UUID,db:AsyncSession=D[m
+     return PipelineResult([m
+         id=pipeline_row.id,[m
+         pipeline_id=pipeline_row.pipeline_id,[m
+[32m+[m[32m        session_id=pipeline_row.session_id,[m
+[32m+[m[32m        created_at=pipeline_row.created_at,[m
+         query=pipeline_row.query,[m
+         query_variants=pipeline_row.query_variants,[m
+         translated_query=pipeline_row.translated_query,[m
+[1mdiff --git a/backend/src/api/schema.py b/backend/src/api/schema.py[m
+[1mindex 100a400..90708a6 100644[m
+[1m--- a/backend/src/api/schema.py[m
+[1m+++ b/backend/src/api/schema.py[m
+[36m@@ -28,6 +28,7 @@[m [mclass PipelineUpdate(BaseModel):[m
+ class QueryRequest(BaseModel):[m
+     model_config = ConfigDict(str_strip_whitespace=True)[m
+     query:str = Field(...,min_length=1)[m
+[32m+[m[32m    session_id:Optional[UUID4] = None[m
+ [m
+ class CompareRequest(BaseModel):[m
+     model_config = ConfigDict(str_strip_whitespace=True)[m
+[1mdiff --git a/backend/src/api/task.py b/backend/src/api/task.py[m
+[1mindex 2ed5e6d..bc67b7b 100644[m
+[1m--- a/backend/src/api/task.py[m
+[1m+++ b/backend/src/api/task.py[m
+[36m@@ -68,7 +68,7 @@[m [mdef ingest_task(config_dict:dict,object_name:str)->None:[m
+             tmp.write(response.read())[m
+             tmp_path = tmp.name[m
+         [m
+[31m-        run_ingest(tmp_path,pipeline_config)[m
+[32m+[m[32m        run_ingest(tmp_path,pipeline_config,source_name=object_name.rsplit("/",1)[-1])[m
+ [m
+         with get_sync_db() as db:[m
+             update_pipeline_status(db,pipeline_config.id,status="ready")[m
+[1mdiff --git a/backend/src/database/models/pipeline_result.py b/backend/src/database/models/pipeline_result.py[m
+[1mindex 63cf5d9..5f49f64 100644[m
+[1m--- a/backend/src/database/models/pipeline_result.py[m
+[1m+++ b/backend/src/database/models/pipeline_result.py[m
+[36m@@ -1,7 +1,8 @@[m
+ from __future__ import annotations[m
+ from src.database.models.base import Base[m
+ from sqlalchemy.orm import Mapped, mapped_column, relationship[m
+[31m-from sqlalchemy import Text,ForeignKey[m
+[32m+[m[32mfrom sqlalchemy import Text,ForeignKey,DateTime[m
+[32m+[m[32mfrom datetime import datetime,timezone[m
+ import uuid[m
+ from sqlalchemy.dialects.postgresql import UUID,JSONB[m
+ from typing import List, TYPE_CHECKING[m
+[36m@@ -21,6 +22,17 @@[m [mclass PipelineResultModel(Base):[m
+         index=True,[m
+     )[m
+ [m
+[32m+[m[32m    session_id:Mapped[uuid.UUID | None] = mapped_column([m
+[32m+[m[32m        UUID(as_uuid=True),[m
+[32m+[m[32m        nullable=True,[m
+[32m+[m[32m        index=True,[m
+[32m+[m[32m    )[m
+[32m+[m[32m    created_at:Mapped[datetime] = mapped_column([m
+[32m+[m[32m        DateTime(timezone=True),[m
+[32m+[m[32m        default=lambda: datetime.now(timezone.utc),[m
+[32m+[m[32m        nullable=False,[m
+[32m+[m[32m    )[m
+[32m+[m
+     query:Mapped[str] = mapped_column(Text,nullable=False)[m
+     translated_query:Mapped[str | None] = mapped_column(Text,nullable=True)[m
+     query_variants:Mapped[list[str] | None] = mapped_column(JSONB,nullable=True)[m
+[1mdiff --git a/backend/src/main.py b/backend/src/main.py[m
+[1mindex 00bdfe9..b29f2ff 100644[m
+[1m--- a/backend/src/main.py[m
+[1m+++ b/backend/src/main.py[m
+[36m@@ -71,7 +71,7 @@[m [masync def health(request:Request,response:Response):[m
+ [m
+     try:[m
+         client = app.state.redis_client[m
+[31m-        if client.ping():[m
+[32m+[m[32m        if await client.ping():[m
+             checks["redis"] = "healthy"[m
+         else:[m
+             checks["redis"] = "unhealthy"[m
+[36m@@ -81,7 +81,7 @@[m [masync def health(request:Request,response:Response):[m
+ [m
+     try:[m
+         client = app.state.qdrant_client[m
+[31m-        if client.info():[m
+[32m+[m[32m        if await client.info():[m
+             checks["qdrant"] = "healthy"[m
+         else:[m
+             checks["qdrant"] = "unhealthy"[m
+[1mdiff --git a/backend/src/rag/core.py b/backend/src/rag/core.py[m
+[1mindex 79c633d..0cf0dad 100644[m
+[1m--- a/backend/src/rag/core.py[m
+[1m+++ b/backend/src/rag/core.py[m
+[36m@@ -73,9 +73,9 @@[m [mdef get_llm(config:PipelineConfig)->ChatGoogleGenerativeAI:[m
+     model = config.generation.llm[m
+     if model not in _llm:[m
+         if config.generation.provider == Provider.GOOGLE:[m
+[31m-            _llm[model] = ChatGoogleGenerativeAI(model=config.generation.llm, temperature=0,google_api_key=settings.google_api_key)[m
+[32m+[m[32m            _llm[model] = ChatGoogleGenerativeAI(model=config.generation.llm,google_api_key=settings.google_api_key)[m
+         elif config.generation.provider == Provider.ANTHROPIC:[m
+[31m-            _llm[model] = ChatAnthropic(model=config.generation.llm, temperature=0,anthropic_api_key=settings.anthropic_api_key)[m
+[32m+[m[32m            _llm[model] = ChatAnthropic(model=config.generation.llm,anthropic_api_key=settings.anthropic_api_key)[m
+     return _llm[model][m
+ [m
+ [m
+[1mdiff --git a/backend/src/rag/ingest.py b/backend/src/rag/ingest.py[m
+[1mindex 548d4f7..cac90d5 100644[m
+[1m--- a/backend/src/rag/ingest.py[m
+[1m+++ b/backend/src/rag/ingest.py[m
+[36m@@ -1,4 +1,5 @@[m
+ from langchain_unstructured import UnstructuredLoader[m
+[32m+[m[32mfrom langchain_core.documents import Document[m
+ from qdrant_client.http.models import Distance, VectorParams,SparseVectorParams[m
+ from src.rag.core import get_client, get_embeddings[m
+ from src.rag.models import PipelineConfig,ModeConfig[m
+[36m@@ -26,14 +27,31 @@[m [mdef ensure_collection(config:PipelineConfig):[m
+ [m
+ [m
+ [m
+[31m-def run_ingest(file : str, config : PipelineConfig) -> None:    [m
+[32m+[m[32mdef merge_elements_by_page(docs:list[Document],source:str)->list[Document]:[m
+[32m+[m[32m    """[m
+[32m+[m[32m    UnstructuredLoader returns one document per element (title, paragraph, ...),[m
+[32m+[m[32m    so chunk_size is never reached. Merge elements back into one document per page[m
+[32m+[m[32m    before splitting.[m
+[32m+[m[32m    """[m
+[32m+[m[32m    pages:dict = {}[m
+[32m+[m[32m    for doc in docs:[m
+[32m+[m[32m        pages.setdefault(doc.metadata.get("page_number"),[]).append(doc.page_content)[m
+[32m+[m[32m    return [[m
+[32m+[m[32m        Document(page_content="\n\n".join(contents),metadata={"source":source,"page":page})[m
+[32m+[m[32m        for page,contents in pages.items()[m
+[32m+[m[32m    ][m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef run_ingest(file : str, config : PipelineConfig, source_name : str | None = None) -> None:[m
+     ensure_collection(config)[m
+     loader = UnstructuredLoader(file)[m
+     docs = loader.load()[m
+ [m
+     if not docs:[m
+         raise ValueError(f"No content extrcated from {file}")[m
+[31m-    [m
+[32m+[m
+[32m+[m[32m    docs = merge_elements_by_page(docs,source_name or file)[m
+[32m+[m
+     if config.chunking.parent_doc:[m
+         retriever = get_parent_doc_retriever(config)[m
+         retriever.add_documents(docs)[m
+[1mdiff --git a/backend/src/rag/models.py b/backend/src/rag/models.py[m
+[1mindex 304531a..eed09bb 100644[m
+[1m--- a/backend/src/rag/models.py[m
+[1m+++ b/backend/src/rag/models.py[m
+[36m@@ -104,7 +104,7 @@[m [mclass GenerationConfig(BaseModel):[m
+ [m
+ class PipelineConfig(BaseModel):[m
+     model_config = ConfigDict(str_strip_whitespace=True)[m
+[31m-    id: UUID4 = Field(default_factory=uuid4)[m
+[32m+[m[32m    id: Optional[UUID4] = None[m
+     name: str = Field(min_length=1)[m
+     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))[m
+     status: PipelineStatus = PipelineStatus.DRAFT[m
+[36m@@ -195,10 +195,13 @@[m [mclass ChunkTrace(BaseModel):[m
+     source:str[m
+     raw_score:float[m
+     rerank_score:float|None[m
+[32m+[m[32m    by:str|None = None[m
+ [m
+ class PipelineResult(BaseModel):[m
+     id:UUID4|None = Field(default_factory=uuid4)[m
+     pipeline_id:UUID4[m
+[32m+[m[32m    session_id:UUID4|None = None[m
+[32m+[m[32m    created_at:datetime|None = None[m
+     query:str[m
+     query_variants:list[str] | None[m
+     translated_query:str|None[m
+[1mdiff --git a/backend/src/rag/steps/generation.py b/backend/src/rag/steps/generation.py[m
+[1mindex 167e742..2280a5d 100644[m
+[1m--- a/backend/src/rag/steps/generation.py[m
+[1m+++ b/backend/src/rag/steps/generation.py[m
+[36m@@ -17,8 +17,7 @@[m [masync def generate(query:str,docs:list[Document],config:PipelineConfig)->tuple[s[m
+         | llm[m
+         | StrOutputParser()[m
+     )[m
+[31m-    [m
+[32m+[m[32m    trace["context_sent_to_llm"] = context[m
+     answer = await chain.ainvoke({"question":query,"context":context})[m
+ [m
+[31m-    trace["context_sent_to_llm"] = context[m
+     return answer,trace[m
+\ No newline at end of file[m
+[1mdiff --git a/backend/src/rag/steps/post_retrieval.py b/backend/src/rag/steps/post_retrieval.py[m
+[1mindex 06e9147..ba3edbb 100644[m
+[1m--- a/backend/src/rag/steps/post_retrieval.py[m
+[1m+++ b/backend/src/rag/steps/post_retrieval.py[m
+[36m@@ -1,4 +1,5 @@[m
+ [m
+[32m+[m[32mimport math[m
+ from src.rag.models import PipelineConfig[m
+ from langchain_classic.docstore.document import Document[m
+ from src.rag.models import RerankerConfig[m
+[36m@@ -13,8 +14,9 @@[m [masync def post_retrieval(config:PipelineConfig,trace:dict,query:str,docs:list[Do[m
+     if config.post_retrieval.reranker == RerankerConfig.RECIPROCAL_RANK_FUSION and config.query_translation.multi_query:[m
+         raw_results = trace["raw_results"][m
+         if raw_results:[m
+[31m-            docs = _rrf_score(all_results=raw_results,top_n=config.post_retrieval.top_n)[m
+[32m+[m[32m            docs,scores = _rrf_score(all_results=raw_results,top_n=config.post_retrieval.top_n)[m
+             post_trace["rrf_applied"] = True[m
+[32m+[m[32m            post_trace["reranked_chunks"] = scores[m
+ [m
+     elif config.post_retrieval.reranker == RerankerConfig.COHERE:[m
+         docs,scores = _cohere_rerank(config,docs,query)[m
+[36m@@ -63,11 +65,14 @@[m [mdef _cross_encoder_rerank(config:PipelineConfig,query:str,docs:list[Document])->[m
+     result_docs = [][m
+     result_scores = [][m
+     for score,doc in scored[:config.post_retrieval.top_n]:[m
+[31m-        doc.metadata["rerank_score"] = float(score)[m
+[32m+[m[32m        # ms-marco cross-encoders output raw logits; sigmoid maps them to a[m
+[32m+[m[32m        # 0-1 relevance probability without changing the ranking order.[m
+[32m+[m[32m        prob = 1/(1+math.exp(-float(score)))[m
+[32m+[m[32m        doc.metadata["rerank_score"] = prob[m
+         result_docs.append(doc)[m
+         result_scores.append({[m
+             "content": doc.page_content,[m
+[31m-            "rerank_score":float(score),[m
+[32m+[m[32m            "rerank_score":prob,[m
+             "source": doc.metadata.get("source"),[m
+             "page": doc.metadata.get("page"),[m
+             "retrieved_by": doc.metadata.get("retrieved_by"),[m
+[36m@@ -95,7 +100,7 @@[m [mdef _deduplicate(all_result:list[Document])->list[Document]:[m
+ [m
+ [m
+ [m
+[31m-def _rrf_score(all_results:list[list],top_n:int=5,k:int=60)->list:[m
+[32m+[m[32mdef _rrf_score(all_results:list[list],top_n:int=5,k:int=60)->tuple[list[Document],list[dict]]:[m
+     scores: dict[str, float] = {}[m
+     doc_map: dict[str, Document] = {}[m
+     for docs in all_results:[m
+[36m@@ -105,5 +110,18 @@[m [mdef _rrf_score(all_results:list[list],top_n:int=5,k:int=60)->list:[m
+             doc_map[key] = doc[m
+     # return top_n sorted by score[m
+     sorted_keys = sorted(scores, key=lambda x: scores[x], reverse=True)[m
+[31m-    return [doc_map[k] for k in sorted_keys[:top_n]][m
+[32m+[m[32m    result_docs = [][m
+[32m+[m[32m    result_scores = [][m
+[32m+[m[32m    for key in sorted_keys[:top_n]:[m
+[32m+[m[32m        doc = doc_map[key][m
+[32m+[m[32m        doc.metadata["rerank_score"] = float(scores[key])[m
+[32m+[m[32m        result_docs.append(doc)[m
+[32m+[m[32m        result_scores.append({[m
+[32m+[m[32m            "content": doc.page_content,[m
+[32m+[m[32m            "rerank_score": float(scores[key]),[m
+[32m+[m[32m            "source": doc.metadata.get("source"),[m
+[32m+[m[32m            "page": doc.metadata.get("page"),[m
+[32m+[m[32m            "retrieved_by": doc.metadata.get("retrieved_by"),[m
+[32m+[m[32m        })[m
+[32m+[m[32m    return result_docs,result_scores[m
+     [m
+\ No newline at end of file[

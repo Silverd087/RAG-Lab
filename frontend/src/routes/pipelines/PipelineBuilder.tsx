@@ -35,14 +35,19 @@ const DEFAULT_PROMPT = 'Answer the question using only the context below.\n\nCon
 const PROVIDER_LABELS: Record<Provider, string> = {
   google: 'Google',
   anthropic: 'Anthropic',
+  huggingface: 'Hugging Face',
 };
 
 const EMBEDDING_MODELS: Record<Provider, string[]> = {
   google: ['gemini-embedding-001', 'text-embedding-004'],
   anthropic: ['voyage-3-large', 'voyage-3.5'],
+  huggingface: ['sentence-transformers/all-MiniLM-L6-v2', 'sentence-transformers/all-mpnet-base-v2', 'BAAI/bge-small-en-v1.5'],
 };
 
-const LLM_MODELS: Record<Provider, string[]> = {
+// Backend get_llm only supports Google and Anthropic
+type GenerationProvider = Exclude<Provider, 'huggingface'>;
+
+const LLM_MODELS: Record<GenerationProvider, string[]> = {
   google: ['gemini-2.5-flash', 'gemini-2.5-pro'],
   anthropic: ['claude-sonnet-5', 'claude-haiku-4-5-20251001', 'claude-opus-4-8'],
 };
@@ -74,7 +79,7 @@ export function PipelineBuilder() {
   const [topN, setTopN] = useState(5);
   const [reorder, setReorder] = useState(false);
 
-  const [generationProvider, setGenerationProvider] = useState<Provider>('google');
+  const [generationProvider, setGenerationProvider] = useState<GenerationProvider>('google');
   const [llm, setLlm] = useState('gemini-2.5-flash');
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
 
@@ -83,9 +88,14 @@ export function PipelineBuilder() {
     setEmbeddingModel(EMBEDDING_MODELS[p][0]);
   };
 
-  const changeGenerationProvider = (p: Provider) => {
+  const changeGenerationProvider = (p: GenerationProvider) => {
     setGenerationProvider(p);
     setLlm(LLM_MODELS[p][0]);
+  };
+
+  const changeMultiQuery = (v: boolean) => {
+    setMultiQuery(v);
+    if (!v && reranker === 'reciprocal_rank_fusion') setReranker('none');
   };
 
   const createMutation = useMutation({
@@ -196,6 +206,7 @@ export function PipelineBuilder() {
                   <Select value={indexingProvider} onChange={(e) => changeIndexingProvider(e.target.value as Provider)}>
                     <option value="google">Google</option>
                     <option value="anthropic">Anthropic</option>
+                    <option value="huggingface">Hugging Face</option>
                   </Select>
                 </Field>
                 <Field label="Embedding model">
@@ -210,7 +221,7 @@ export function PipelineBuilder() {
 
             {step === 3 && (
               <>
-                <Toggle checked={multiQuery} onChange={setMultiQuery} label="Multi-query" desc="Generate several query variants and merge results." />
+                <Toggle checked={multiQuery} onChange={changeMultiQuery} label="Multi-query" desc="Generate several query variants and merge results." />
                 <Toggle checked={hyde} onChange={setHyde} label="HyDE" desc="Retrieve using a hypothetical answer document." />
                 <Toggle checked={stepBack} onChange={setStepBack} label="Step-back prompting" desc="Ask a more general question first." />
               </>
@@ -239,7 +250,9 @@ export function PipelineBuilder() {
                     <option value="none">None</option>
                     <option value="cross-encoder">Cross-encoder</option>
                     <option value="cohere">Cohere</option>
-                    <option value="reciprocal_rank_fusion">Reciprocal rank fusion</option>
+                    <option value="reciprocal_rank_fusion" disabled={!multiQuery}>
+                      Reciprocal rank fusion{multiQuery ? '' : ' (requires multi-query)'}
+                    </option>
                   </Select>
                 </Field>
                 {reranker !== 'none' && (
@@ -254,7 +267,7 @@ export function PipelineBuilder() {
             {step === 6 && (
               <>
                 <Field label="Provider">
-                  <Select value={generationProvider} onChange={(e) => changeGenerationProvider(e.target.value as Provider)}>
+                  <Select value={generationProvider} onChange={(e) => changeGenerationProvider(e.target.value as GenerationProvider)}>
                     <option value="google">Google</option>
                     <option value="anthropic">Anthropic</option>
                   </Select>

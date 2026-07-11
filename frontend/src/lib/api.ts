@@ -69,8 +69,11 @@ export const api = {
   },
   listDocuments: (id: string) => request<DocumentResponse[]>(`/pipelines/${id}/documents`),
 
-  queryPipeline: (id: string, query: string) =>
-    request<PipelineResult>(`/pipelines/${id}/query`, { method: 'POST', body: JSON.stringify({ query }) }),
+  queryPipeline: (id: string, query: string, sessionId?: string) =>
+    request<PipelineResult>(`/pipelines/${id}/query`, {
+      method: 'POST',
+      body: JSON.stringify({ query, session_id: sessionId ?? null }),
+    }),
   getPipelineResults: (id: string) => request<PipelineResult[]>(`/pipelines/${id}/results`),
 
   compare: (pipeline_id1: string, pipeline_id2: string, query: string) =>

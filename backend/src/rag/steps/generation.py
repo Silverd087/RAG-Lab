@@ -17,8 +17,7 @@ async def generate(query:str,docs:list[Document],config:PipelineConfig)->tuple[s
         | llm
         | StrOutputParser()
     )
-    
+    trace["context_sent_to_llm"] = context
     answer = await chain.ainvoke({"question":query,"context":context})
 
-    trace["context_sent_to_llm"] = context
     return answer,trace

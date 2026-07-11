@@ -73,9 +73,9 @@ def get_llm(config:PipelineConfig)->ChatGoogleGenerativeAI:
     model = config.generation.llm
     if model not in _llm:
         if config.generation.provider == Provider.GOOGLE:
-            _llm[model] = ChatGoogleGenerativeAI(model=config.generation.llm, temperature=0,google_api_key=settings.google_api_key)
+            _llm[model] = ChatGoogleGenerativeAI(model=config.generation.llm,google_api_key=settings.google_api_key)
         elif config.generation.provider == Provider.ANTHROPIC:
-            _llm[model] = ChatAnthropic(model=config.generation.llm, temperature=0,anthropic_api_key=settings.anthropic_api_key)
+            _llm[model] = ChatAnthropic(model=config.generation.llm,anthropic_api_key=settings.anthropic_api_key)
     return _llm[model]
 
 

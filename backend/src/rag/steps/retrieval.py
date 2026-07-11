@@ -19,14 +19,16 @@ async def retrieve(query:str|list,config:PipelineConfig)-> tuple[list,dict]:
                 doc.metadata["retrieved_by"] = query_variant
         trace["raw_results"] = list(all_docs)
         docs = [doc for results in all_docs for doc in results]
-        return docs,trace
-    
+        trace_docs = _deduplicate_by_content(docs)
     elif config.chunking.parent_doc:
         docs = await _parent_doc_retrieve(query, config)
+        trace_docs = docs
     elif config.retrieval.mode == ModeConfig.MMR:
         docs = await _mmr_doc_retrieve(query,config)
+        trace_docs = docs
     else:
         docs = await _standard_retrieve(query,config)
+        trace_docs = docs
 
     trace["retrieved_chunks"] = [
         {
@@ -34,10 +36,20 @@ async def retrieve(query:str|list,config:PipelineConfig)-> tuple[list,dict]:
             "score": doc.metadata.get("score", 0.0),
             "source": doc.metadata.get("source"),
             "page": doc.metadata.get("page"),
+            "retrieved_by": doc.metadata.get("retrieved_by"),
         }
-        for doc in docs
+        for doc in trace_docs
     ]
     return docs, trace
+
+def _deduplicate_by_content(docs:list[Document])->list[Document]:
+    seen = set()
+    unique = []
+    for doc in docs:
+        if doc.page_content not in seen:
+            seen.add(doc.page_content)
+            unique.append(doc)
+    return unique
 
 async def _parent_doc_retrieve(query:str,config:PipelineConfig)->list[Document]:
         base_retriever = get_parent_doc_retriever(config)

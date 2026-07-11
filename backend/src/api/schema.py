@@ -28,6 +28,7 @@ class PipelineUpdate(BaseModel):
 class QueryRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     query:str = Field(...,min_length=1)
+    session_id:Optional[UUID4] = None
 
 class CompareRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)

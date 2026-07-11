@@ -71,7 +71,7 @@ async def health(request:Request,response:Response):
 
     try:
         client = app.state.redis_client
-        if client.ping():
+        if await client.ping():
             checks["redis"] = "healthy"
         else:
             checks["redis"] = "unhealthy"
@@ -81,7 +81,7 @@ async def health(request:Request,response:Response):
 
     try:
         client = app.state.qdrant_client
-        if client.info():
+        if await client.info():
             checks["qdrant"] = "healthy"
         else:
             checks["qdrant"] = "unhealthy"

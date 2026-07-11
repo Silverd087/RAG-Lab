@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/Button';
 import { Select } from '../../components/Select';
 import { StatusPill } from '../../components/StatusPill';
@@ -29,6 +29,7 @@ interface Session {
 
 export function QueryPlayground() {
   const { flash } = useToast();
+  const queryClient = useQueryClient();
   const { data: pipelines } = useQuery({ queryKey: ['pipelines'], queryFn: api.listPipelines });
   const [pipelineId, setPipelineId] = useState<string>('');
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -38,13 +39,49 @@ export function QueryPlayground() {
   const activePipeline = pipelines?.find((p) => p.id === pipelineId) ?? pipelines?.[0];
   const effectivePipelineId = pipelineId || activePipeline?.id || '';
 
-  const sessionsForPipeline = sessions.filter((s) => s.pipelineId === effectivePipelineId);
-  const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const { data: pastResults } = useQuery({
+    queryKey: ['pipeline-results', effectivePipelineId],
+    queryFn: () => api.getPipelineResults(effectivePipelineId),
+    enabled: !!effectivePipelineId,
+  });
+
+  // Queries answered before this page load, grouped by session and replayed in the sidebar.
+  const historySessions = useMemo<Session[]>(() => {
+    const groups = new Map<string, PipelineResult[]>();
+    for (const r of pastResults ?? []) {
+      const key = r.session_id ?? r.id;
+      if (!key) continue;
+      const group = groups.get(key);
+      if (group) group.push(r);
+      else groups.set(key, [r]);
+    }
+    return [...groups.entries()]
+      .map(([key, results]) => ({
+        id: key,
+        pipelineId: effectivePipelineId,
+        title: results[0].query.slice(0, 60),
+        time: results[results.length - 1].created_at ?? '',
+        messages: results.flatMap((r): Message[] => [
+          { role: 'user', text: r.query },
+          { role: 'assistant', text: r.answer, result: r },
+        ]),
+      }))
+      .sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+  }, [pastResults, effectivePipelineId]);
+
+  const allSessions = [
+    ...sessions,
+    ...historySessions.filter((h) => !sessions.some((s) => s.id === h.id)),
+  ];
+
+  const sessionsForPipeline = allSessions.filter((s) => s.pipelineId === effectivePipelineId);
+  const activeSession = allSessions.find((s) => s.id === activeSessionId);
   const messages = activeSession?.messages ?? [];
   const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
 
   const queryMutation = useMutation({
-    mutationFn: (query: string) => api.queryPipeline(effectivePipelineId, query),
+    mutationFn: ({ query, sessionId }: { query: string; sessionId: string }) =>
+      api.queryPipeline(effectivePipelineId, query, sessionId),
     onError: (err) => flash(err instanceof Error ? err.message : 'Query failed', 'var(--red)'),
   });
 
@@ -53,12 +90,13 @@ export function QueryPlayground() {
     if (!query || !effectivePipelineId) return;
     setInput('');
 
-    let sessionId = activeSessionId;
+    const existingSession = allSessions.find((s) => s.id === activeSessionId && s.pipelineId === effectivePipelineId);
+    const sessionId = existingSession ? existingSession.id : crypto.randomUUID();
     setSessions((prev) => {
       let next = prev;
-      if (!sessionId || !prev.find((s) => s.id === sessionId)) {
-        sessionId = crypto.randomUUID();
-        const newSession: Session = {
+      if (!prev.find((s) => s.id === sessionId)) {
+        // Continuing a server-history session copies it into local state.
+        const newSession: Session = existingSession ?? {
           id: sessionId,
           pipelineId: effectivePipelineId,
           title: query.slice(0, 60),
@@ -73,7 +111,7 @@ export function QueryPlayground() {
     });
     setActiveSessionId(sessionId);
 
-    queryMutation.mutate(query, {
+    queryMutation.mutate({ query, sessionId }, {
       onSuccess: (result) => {
         setSessions((prev) =>
           prev.map((s) =>
@@ -82,22 +120,25 @@ export function QueryPlayground() {
               : s,
           ),
         );
+        queryClient.invalidateQueries({ queryKey: ['pipeline-results', effectivePipelineId] });
       },
     });
   }
 
   function toggleSources(index: number) {
-    if (!activeSessionId) return;
-    setSessions((prev) =>
-      prev.map((s) =>
-        s.id !== activeSessionId
+    const active = allSessions.find((s) => s.id === activeSessionId);
+    if (!active) return;
+    setSessions((prev) => {
+      const base = prev.some((s) => s.id === active.id) ? prev : [active, ...prev];
+      return base.map((s) =>
+        s.id !== active.id
           ? s
           : {
               ...s,
               messages: s.messages.map((m, i) => (i === index ? { ...m, showSources: !m.showSources } : m)),
             },
-      ),
-    );
+      );
+    });
   }
 
   const chunkPanel = useMemo(() => lastAssistant?.result?.chunks ?? [], [lastAssistant]);
@@ -135,7 +176,7 @@ export function QueryPlayground() {
             >
               <div className={styles.sessionTitle}>{s.title}</div>
               <div className={styles.sessionMeta}>
-                {timeAgo(s.time)} · {s.messages.length} msgs
+                {s.time ? `${timeAgo(s.time)} · ` : ''}{s.messages.length} msgs
               </div>
             </button>
           ))}

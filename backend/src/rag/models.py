@@ -104,7 +104,7 @@ class GenerationConfig(BaseModel):
 
 class PipelineConfig(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-    id: UUID4 = Field(default_factory=uuid4)
+    id: Optional[UUID4] = None
     name: str = Field(min_length=1)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: PipelineStatus = PipelineStatus.DRAFT
@@ -195,10 +195,13 @@ class ChunkTrace(BaseModel):
     source:str
     raw_score:float
     rerank_score:float|None
+    by:str|None = None
 
 class PipelineResult(BaseModel):
     id:UUID4|None = Field(default_factory=uuid4)
     pipeline_id:UUID4
+    session_id:UUID4|None = None
+    created_at:datetime|None = None
     query:str
     query_variants:list[str] | None
     translated_query:str|None

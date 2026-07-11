@@ -4,6 +4,7 @@ from src.rag.models import PipelineConfig,PipelineResult,ChunkTrace
 from src.database.session import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from src.database.models.pipeline import PipelineModel,PipelineStatusEnum
 from src.database.models.pipeline_result import PipelineResultModel
 from src.database.models.chunk_trace import ChunkTraceModel
@@ -40,6 +41,7 @@ async def query_pipeline(id:uuid.UUID,payload:QueryRequest,db:AsyncSession = Dep
 
     result = PipelineResultModel(
         pipeline_id = id,
+        session_id = payload.session_id,
         query = query,
         translated_query = pipeline_result.translated_query,
         query_variants = pipeline_result.query_variants,
@@ -55,23 +57,31 @@ async def query_pipeline(id:uuid.UUID,payload:QueryRequest,db:AsyncSession = Dep
 
     db.add(result)
     await db.flush()
-    updated_result = pipeline_result.model_copy(update={"id": result.id})
+    updated_result = pipeline_result.model_copy(update={
+        "id": result.id,
+        "session_id": result.session_id,
+        "created_at": result.created_at,
+    })
     return updated_result
 
 @router.get("/pipelines/{id}/results",status_code=status.HTTP_200_OK,response_model=list[PipelineResult])
 async def get_pipeline_history(id:uuid.UUID,db:AsyncSession = Depends(get_db)):
     
-    stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == id)
+    stmt = (
+        select(PipelineResultModel)
+        .where(PipelineResultModel.pipeline_id == id)
+        .options(selectinload(PipelineResultModel.chunks))
+        .order_by(PipelineResultModel.created_at)
+    )
     result = await db.execute(stmt)
 
     pipeline_rows = result.scalars().all()
 
-    if not pipeline_rows:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f'No Pipeline results with id {id} were found')
-
     return [PipelineResult(
         id=pipeline_row.id,
         pipeline_id=pipeline_row.pipeline_id,
+        session_id=pipeline_row.session_id,
+        created_at=pipeline_row.created_at,
         query=pipeline_row.query,
         query_variants=pipeline_row.query_variants,
         translated_query=pipeline_row.translated_query,
@@ -88,7 +98,7 @@ async def get_pipeline_history(id:uuid.UUID,db:AsyncSession = Depends(get_db)):
 @router.get("/pipelines/{id}/results/{result_id}",status_code=status.HTTP_200_OK,response_model=PipelineResult)
 async def get_pipeline_result(id:uuid.UUID,result_id:uuid.UUID,db:AsyncSession=Depends(get_db)):
     
-    stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == id and PipelineResultModel.id == result_id)
+    stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == id, PipelineResultModel.id == result_id).options(selectinload(PipelineResultModel.chunks))
 
     result = await db.execute(stmt)
 
@@ -100,6 +110,8 @@ async def get_pipeline_result(id:uuid.UUID,result_id:uuid.UUID,db:AsyncSession=D
     return PipelineResult(
         id=pipeline_row.id,
         pipeline_id=pipeline_row.pipeline_id,
+        session_id=pipeline_row.session_id,
+        created_at=pipeline_row.created_at,
         query=pipeline_row.query,
         query_variants=pipeline_row.query_variants,
         translated_query=pipeline_row.translated_query,
