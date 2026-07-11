@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select,update
 from src.database.models.pipeline import PipelineModel,PipelineStatusEnum
 import uuid
+from pydantic import ValidationError
 from src.api.schema import PipelineUpdate
 router = APIRouter()
 
@@ -58,21 +59,21 @@ async def delete_pipeline_by_id(id:uuid.UUID,db:AsyncSession = Depends(get_db)):
 
 
 @router.post("/pipelines",tags=['pipeline'],status_code=status.HTTP_201_CREATED,response_model=PipelineConfig)
-async def get_pipeline_by_id(body:PipelineConfig,db:AsyncSession = Depends(get_db)):
+async def create_pipeline(body:PipelineConfig,db:AsyncSession = Depends(get_db)):
     new_pipeline = PipelineModel(
-        id=body.id,
         name=body.name,
         status=body.status,
         created_at=body.created_at,
-        config=body.model_dump(exclude={"id", "name", "status", "created_at","error"})
+        config=body.model_dump(mode="json",exclude={"id", "name", "status", "created_at","error"})
     )
     db.add(new_pipeline)
+    await db.flush()
     return PipelineConfig(
-        id=body.id,
-        name=body.name,
-        status=body.status,
-        created_at=body.created_at,
-        **body.model_dump(exclude={"id", "name", "status", "created_at","error"})
+        id=new_pipeline.id,
+        name=new_pipeline.name,
+        status=new_pipeline.status,
+        created_at=new_pipeline.created_at,
+        **new_pipeline.config
     )
 
 
@@ -116,16 +117,19 @@ async def update_pipeline(id:uuid.UUID,payload:PipelineUpdate,db:AsyncSession=De
             pipeline_row.config = current_config
 
 
-    return PipelineConfig(
-        id=pipeline_row.id,
-        name=pipeline_row.name,
-        status=pipeline_row.status,
-        created_at=pipeline_row.created_at,
-        **pipeline_row.config
-    )
+    try:
+        return PipelineConfig(
+            id=pipeline_row.id,
+            name=pipeline_row.name,
+            status=pipeline_row.status,
+            created_at=pipeline_row.created_at,
+            **pipeline_row.config
+        )
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=e.errors())
 
 
-    
+
 
 
 

@@ -5,8 +5,10 @@ from config import settings
 celery_app = Celery(
     "worker",
     broker=settings.rabbitmq_url,
-    backend="redis://redis:6379"
+    backend=settings.redis_url,
+    include=["src.api.task"]
 )
+celery_app.set_default()
 
 celery_app.conf.queues = (
     Queue("evaluation"),

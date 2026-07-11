@@ -16,6 +16,7 @@ from langchain_classic.storage._lc_store import create_kv_docstore
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_anthropic import ChatAnthropic
 from langchain_voyageai import VoyageAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 
 _client: QdrantClient | None = None
@@ -63,6 +64,8 @@ def get_embeddings(config:PipelineConfig)->GoogleGenerativeAIEmbeddings:
             _embeddings[model] = GoogleGenerativeAIEmbeddings(model=model,google_api_key=settings.google_api_key)
         if config.indexing.provider == Provider.ANTHROPIC:
             _embeddings[model] = VoyageAIEmbeddings(model=model,voyage_api_key=settings.voyage_api_key)
+        if config.indexing.provider == Provider.HUGGINGFACE:
+            _embeddings[model] = HuggingFaceEmbeddings(model_name=model)
 
     return _embeddings[model]
 

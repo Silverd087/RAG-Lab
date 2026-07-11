@@ -8,8 +8,8 @@ def get_minio_client()->Minio:
     if _minio_client is None:
         _minio_client = Minio(
             endpoint=f"{settings.minio_endpoint}",
-            access_key=settings.minio_access_keys,
-            secret_key=settings.minio_secret_keys,
+            access_key=settings.minio_root_user,
+            secret_key=settings.minio_root_password,
             secure=False
         )
     return _minio_client

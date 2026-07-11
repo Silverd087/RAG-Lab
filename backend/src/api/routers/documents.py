@@ -42,7 +42,7 @@ async def upload(id:uuid.UUID,file:UploadFile,db:AsyncSession = Depends(get_db))
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f'Pipeline with id {id} not found')
     object_name = f"pipelines/{id}/{file.filename.lower()}"
     minio_client = get_minio_client()
-    await minio_client.put_object(
+    minio_client.put_object(
                             bucket_name=settings.minio_bucket_name,
                             data=file.file,
                             object_name=object_name,
@@ -55,10 +55,10 @@ async def upload(id:uuid.UUID,file:UploadFile,db:AsyncSession = Depends(get_db))
         status=pipeline_row.status,
         **pipeline_row.config  
     )
-    result = ingest_task.delay(pipeline.model_dump(mode="json"),object_name)
+    ingest_task.delay(pipeline.model_dump(mode="json"),object_name)
 
 
-    return UploadResponse(job_id=result.id)
+    return UploadResponse(job_id=str(pipeline_row.id))
 
 @router.get("/pipelines/{id}/documents",tags=["documents"],response_model=list[DocumentResponse])
 async def get_documents(id:uuid.UUID,db:AsyncSession=Depends(get_db)):
@@ -72,7 +72,7 @@ async def get_documents(id:uuid.UUID,db:AsyncSession=Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="pipeline id not found")
 
     prefix = f"pipelines/{id}/"
-    objects = await minio_client.list_objects(settings.minio_bucket_name, prefix=prefix, recursive=True)
+    objects = minio_client.list_objects(settings.minio_bucket_name, prefix=prefix, recursive=True)
 
     return [
         DocumentResponse(

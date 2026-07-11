@@ -1,4 +1,5 @@
 from celery import shared_task,Task
+from src.celery_app import celery_app
 from src.rag.models import PipelineConfig
 from src.storage.minio_client import get_minio_client
 from config import settings

@@ -8,7 +8,7 @@ from qdrant_client import AsyncQdrantClient
 from config import settings
 import time
 from sqlalchemy import text
-import pika 
+from src.celery_app import celery_app
 from datetime import datetime
 
 @asynccontextmanager
@@ -63,13 +63,9 @@ async def health(request:Request,response:Response):
         checks["minio"] = "unhealthy"
 
     try:
-        parameters = pika.URLParameters(url="amqp://guest:guest@rabbitmq:5672//")
-        connection = pika.BlockingConnection(parameters)
-        if connection.is_open:
-            connection.close()
+        with celery_app.connection_for_write() as connection:
+            connection.connect()
             checks["rabbitmq"] = "healthy"
-        else:
-            checks["rabbitmq"] = "unhealthy"
     except:
             checks["rabbitmq"] = "unhealthy"
 

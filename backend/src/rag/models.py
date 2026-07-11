@@ -44,6 +44,7 @@ class VectorDb(str,Enum):
 class Provider(str,Enum):
     GOOGLE = "google"
     ANTHROPIC = "anthropic"
+    HUGGINGFACE = "huggingface"
 
 class IndexingConfig(BaseModel):
     vector_db: VectorDb = VectorDb.QDRANT
@@ -113,6 +114,12 @@ class PipelineConfig(BaseModel):
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     post_retrieval: PostRetrievalConfig = Field(default_factory=PostRetrievalConfig)
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
+
+    @model_validator(mode='after')
+    def enforce_rrf_requires_multi_query(self)->"PipelineConfig":
+        if self.post_retrieval.reranker == RerankerConfig.RECIPROCAL_RANK_FUSION and not self.query_translation.multi_query:
+            raise ValueError("reciprocal_rank_fusion reranker requires multi_query to be enabled")
+        return self
 
 
 
