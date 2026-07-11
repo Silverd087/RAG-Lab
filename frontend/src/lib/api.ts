@@ -3,6 +3,7 @@ import type {
   BenchmarkResultResponse,
   CompareResponse,
   CompareStatusResponse,
+  ComparisonListItem,
   CreatePipelineInput,
   DatasetItemCreate,
   DatasetItemResponse,
@@ -82,6 +83,7 @@ export const api = {
       body: JSON.stringify({ pipeline_id1, pipeline_id2, query }),
     }),
   getCompareStatus: (comparisonId: string) => request<CompareStatusResponse>(`/compare/${comparisonId}`),
+  listComparisons: () => request<ComparisonListItem[]>('/compare'),
 
   listDatasets: () => request<DatasetListResponse[]>('/datasets'),
   getDataset: (id: string) => request<DatasetResponse>(`/datasets/${id}`),

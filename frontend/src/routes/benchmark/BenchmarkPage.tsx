@@ -172,8 +172,8 @@ function ResultsTable({
           </span>
           <span>{r.scores ? r.scores.faithfulness.toFixed(2) : '—'}</span>
           <span>{r.scores ? r.scores.answer_relevance.toFixed(2) : '—'}</span>
-          <span>{r.scores ? r.scores.context_precision.toFixed(2) : '—'}</span>
-          <span>{r.scores ? r.scores.context_recall.toFixed(2) : '—'}</span>
+          <span>{r.scores?.context_precision != null ? r.scores.context_precision.toFixed(2) : '—'}</span>
+          <span>{r.scores?.context_recall != null ? r.scores.context_recall.toFixed(2) : '—'}</span>
         </TableRow>
       ))}
     </Table>

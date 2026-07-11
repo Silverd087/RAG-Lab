@@ -38,8 +38,10 @@ class CompareRequest(BaseModel):
 
 class DeepEvalScores(BaseModel):
     faithfulness: float
-    context_recall:float
-    context_precision:float
+    # Contextual precision/recall need a ground-truth expected_output, which
+    # ad-hoc comparisons don't have — only benchmarks against a dataset do.
+    context_recall:Optional[float] = None
+    context_precision:Optional[float] = None
     answer_relevance: float
 
 class JobStatusResponse(BaseModel):
@@ -139,6 +141,14 @@ class CompareStatusResponse(BaseModel):
     result_1:UUID4
     result_2:UUID4
     evaluation_scores:Optional[dict]
+    result1:Optional[PipelineResult] = None
+    result2:Optional[PipelineResult] = None
+
+class ComparisonListItem(BaseModel):
+    id:UUID4
+    query:str
+    status:str
+    created_at:datetime
 
 class DatasetUpdateQuery(BaseModel):
     name:Optional[str] = None

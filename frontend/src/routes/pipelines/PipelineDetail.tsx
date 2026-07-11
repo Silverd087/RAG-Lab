@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Topbar } from '../../components/Topbar';
@@ -6,17 +6,19 @@ import { Tabs } from '../../components/Tabs';
 import { StatusPill } from '../../components/StatusPill';
 import { Table, TableHead, TableRow } from '../../components/DataTable';
 import { EmptyState } from '../../components/EmptyState';
+import { ConfigPill } from '../../components/ConfigPill';
 import { IconChat, IconDocument, IconUpload } from '../../components/Icons';
 import { api } from '../../lib/api';
 import { fileSize, timeAgo } from '../../lib/format';
 import { useToast } from '../../components/Toast';
+import type { PipelineConfig } from '../../lib/types';
 import styles from './PipelineDetail.module.css';
 
 export function PipelineDetail() {
   const { id = '' } = useParams();
   const { flash } = useToast();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'documents' | 'history'>('documents');
+  const [tab, setTab] = useState<'documents' | 'history' | 'config'>('config');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +65,7 @@ export function PipelineDetail() {
       <div className={styles.content}>
         <Tabs
           tabs={[
+            { key: 'config', label: 'Configuration' },
             { key: 'documents', label: 'Documents' },
             { key: 'history', label: 'Query history' },
           ]}
@@ -153,7 +156,111 @@ export function PipelineDetail() {
             )}
           </div>
         )}
+
+        {tab === 'config' && (
+          <div className={styles.tabBody}>
+            {!pipeline && <div className={styles.muted}>Loading…</div>}
+            {pipeline && <ConfigView pipeline={pipeline} />}
+          </div>
+        )}
       </div>
     </>
+  );
+}
+
+function ConfigView({ pipeline }: { pipeline: PipelineConfig }) {
+  const { chunking, indexing, query_translation, retrieval, post_retrieval, generation } = pipeline;
+
+  const translations = [
+    query_translation.multi_query && 'Multi-query',
+    query_translation.hyde && 'HyDE',
+    query_translation.step_back && 'Step-back',
+  ].filter(Boolean) as string[];
+
+  return (
+    <div className={styles.configGrid}>
+      <ConfigSection title="Chunking">
+        <ConfigRow label="Strategy" value={chunking.strategy} />
+        <ConfigRow label="Chunk size" value={String(chunking.chunk_size)} />
+        <ConfigRow label="Overlap" value={String(chunking.overlap)} />
+        <ConfigRow label="Parent documents" value={chunking.parent_doc ? 'enabled' : 'disabled'} />
+        {chunking.parent_doc && (
+          <>
+            <ConfigRow label="Parent chunk size" value={String(chunking.parent_chunk_size ?? '—')} />
+            <ConfigRow label="Parent overlap" value={String(chunking.parent_overlap ?? '—')} />
+          </>
+        )}
+      </ConfigSection>
+
+      <ConfigSection title="Indexing">
+        <ConfigRow label="Vector store" value={indexing.vector_db} />
+        <ConfigRow label="Provider" value={indexing.provider} />
+        <ConfigRow label="Embedding model" value={indexing.embedding_model} />
+      </ConfigSection>
+
+      <ConfigSection title="Query translation">
+        {translations.length === 0 && <ConfigRow label="Techniques" value="none" />}
+        {translations.length > 0 && (
+          <div className={styles.configRow}>
+            <span className={styles.configLabel}>Techniques</span>
+            <span className={styles.configPills}>
+              {translations.map((t) => (
+                <ConfigPill key={t}>{t}</ConfigPill>
+              ))}
+            </span>
+          </div>
+        )}
+      </ConfigSection>
+
+      <ConfigSection title="Retrieval">
+        <ConfigRow label="Mode" value={retrieval.mode} />
+        <ConfigRow label="Top K" value={String(retrieval.top_k)} />
+      </ConfigSection>
+
+      <ConfigSection title="Post-retrieval">
+        <ConfigRow label="Reranker" value={post_retrieval.reranker} />
+        {post_retrieval.reranker !== 'none' && (
+          <ConfigRow label="Top N" value={String(post_retrieval.top_n ?? '—')} />
+        )}
+        {post_retrieval.reranker === 'cross-encoder' && (
+          <ConfigRow label="Cross-encoder" value={post_retrieval.cross_encoder_model ?? '—'} />
+        )}
+        {post_retrieval.reranker === 'cohere' && (
+          <ConfigRow label="Cohere model" value={post_retrieval.cohere_model ?? '—'} />
+        )}
+        <ConfigRow label="Reorder" value={post_retrieval.reorder ? 'enabled' : 'disabled'} />
+        <ConfigRow label="Compression" value={post_retrieval.compression ? 'enabled' : 'disabled'} />
+      </ConfigSection>
+
+      <ConfigSection title="Generation">
+        <ConfigRow label="Provider" value={generation.provider} />
+        <ConfigRow label="LLM" value={generation.llm} />
+        <ConfigRow label="Streaming" value={generation.streaming ? 'enabled' : 'disabled'} />
+        {generation.prompt?.prompt && (
+          <div className={styles.configPrompt}>
+            <span className={styles.configLabel}>Prompt template</span>
+            <pre className={styles.configPromptText}>{generation.prompt.prompt}</pre>
+          </div>
+        )}
+      </ConfigSection>
+    </div>
+  );
+}
+
+function ConfigSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className={styles.configSection}>
+      <h3 className={styles.configTitle}>{title}</h3>
+      <div className={styles.configRows}>{children}</div>
+    </div>
+  );
+}
+
+function ConfigRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.configRow}>
+      <span className={styles.configLabel}>{label}</span>
+      <span className={styles.configValue}>{value}</span>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Topbar } from '../../components/Topbar';
 import { Button } from '../../components/Button';
 import { Select, Input } from '../../components/Select';
@@ -9,7 +9,7 @@ import { Skeleton } from '../../components/Skeleton';
 import { EmptyState } from '../../components/EmptyState';
 import { IconCompare } from '../../components/Icons';
 import { api } from '../../lib/api';
-import { renderMarkdownLite } from '../../lib/format';
+import { renderMarkdownLite, timeAgo } from '../../lib/format';
 import { pipelinePills } from '../../lib/pipelineLabels';
 import { useToast } from '../../components/Toast';
 import type { CompareResponse, DeepEvalScores, PipelineConfig, PipelineResult } from '../../lib/types';
@@ -29,9 +29,13 @@ const LATENCY_STEPS: { key: string; label: string; color: string }[] = [
   { key: 'generation_ms', label: 'generation', color: 'var(--amber)' },
 ];
 
+const TERMINAL_STATUSES = new Set(['completed', 'failed']);
+
 export function ComparePage() {
   const { flash } = useToast();
+  const queryClient = useQueryClient();
   const { data: pipelines } = useQuery({ queryKey: ['pipelines'], queryFn: api.listPipelines });
+  const { data: pastComparisons } = useQuery({ queryKey: ['comparisons'], queryFn: api.listComparisons });
   const [idA, setIdA] = useState('');
   const [idB, setIdB] = useState('');
   const [query, setQuery] = useState('');
@@ -41,7 +45,10 @@ export function ComparePage() {
 
   const compareMutation = useMutation({
     mutationFn: () => api.compare(idA, idB, query),
-    onSuccess: (res) => setResult(res),
+    onSuccess: (res) => {
+      setResult(res);
+      queryClient.invalidateQueries({ queryKey: ['comparisons'] });
+    },
     onError: (err) => flash(err instanceof Error ? err.message : 'Comparison failed', 'var(--red)'),
   });
 
@@ -49,12 +56,27 @@ export function ComparePage() {
     queryKey: ['compare-status', result?.id],
     queryFn: () => api.getCompareStatus(result!.id),
     enabled: !!result,
-    refetchInterval: (query) => (query.state.data?.status === 'completed' ? false : 1500),
+    refetchInterval: (query) =>
+      query.state.data && TERMINAL_STATUSES.has(query.state.data.status) ? false : 1500,
   });
 
-  const pipelineA = pipelines?.find((p) => p.id === idA);
-  const pipelineB = pipelines?.find((p) => p.id === idB);
+  async function openComparison(comparisonId: string) {
+    try {
+      const detail = await api.getCompareStatus(comparisonId);
+      if (!detail.result1 || !detail.result2) {
+        flash('Comparison results are not available', 'var(--red)');
+        return;
+      }
+      setResult({ id: detail.id, result1: detail.result1, result2: detail.result2 });
+    } catch (err) {
+      flash(err instanceof Error ? err.message : 'Failed to load comparison', 'var(--red)');
+    }
+  }
+
+  const pipelineA = pipelines?.find((p) => p.id === result?.result1.pipeline_id);
+  const pipelineB = pipelines?.find((p) => p.id === result?.result2.pipeline_id);
   const evaluationDone = statusQuery.data?.status === 'completed';
+  const evaluationFailed = statusQuery.data?.status === 'failed';
 
   return (
     <>
@@ -111,6 +133,7 @@ export function ComparePage() {
               otherChunks={result.result2.chunks}
               scores={statusQuery.data?.evaluation_scores?.pipeline_a}
               evaluationDone={evaluationDone}
+              evaluationFailed={evaluationFailed}
             />
             <ResultColumn
               pipeline={pipelineB}
@@ -118,7 +141,32 @@ export function ComparePage() {
               otherChunks={result.result1.chunks}
               scores={statusQuery.data?.evaluation_scores?.pipeline_b}
               evaluationDone={evaluationDone}
+              evaluationFailed={evaluationFailed}
             />
+          </div>
+        )}
+
+        {pastComparisons && pastComparisons.length > 0 && (
+          <div>
+            <div className={styles.sectionLabel}>Past comparisons</div>
+            <div className={styles.pastList}>
+              {pastComparisons.map((c) => (
+                <button
+                  key={c.id}
+                  className={styles.pastItem}
+                  data-active={c.id === result?.id}
+                  onClick={() => openComparison(c.id)}
+                >
+                  <span className={styles.pastQuery}>{c.query}</span>
+                  <span className={styles.pastMeta}>
+                    <span className={styles.pastStatus} data-status={c.status}>
+                      {c.status}
+                    </span>
+                    {timeAgo(c.created_at)}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -132,12 +180,14 @@ function ResultColumn({
   otherChunks,
   scores,
   evaluationDone,
+  evaluationFailed,
 }: {
   pipeline: PipelineConfig;
   result: PipelineResult;
   otherChunks: PipelineResult['chunks'];
   scores: DeepEvalScores | undefined;
   evaluationDone: boolean;
+  evaluationFailed: boolean;
 }) {
   return (
     <div className={styles.column}>
@@ -159,16 +209,22 @@ function ResultColumn({
       <div className={styles.sectionLabel}>RAGAS evaluation</div>
       {evaluationDone && scores ? (
         <div className={styles.latencyBlock}>
-          {RAGAS_METRICS.map((m) => (
-            <ScoreBar
-              key={m.key}
-              label={m.label}
-              value={scores[m.key]}
-              displayValue={scores[m.key].toFixed(2)}
-              color="linear-gradient(90deg,#065f46,#10B981)"
-            />
-          ))}
+          {RAGAS_METRICS.map((m) => {
+            const value = scores[m.key];
+            if (value == null) return null;
+            return (
+              <ScoreBar
+                key={m.key}
+                label={m.label}
+                value={value}
+                displayValue={value.toFixed(2)}
+                color="linear-gradient(90deg,#065f46,#10B981)"
+              />
+            );
+          })}
         </div>
+      ) : evaluationFailed || (evaluationDone && !scores) ? (
+        <div className={styles.evalFailed}>Evaluation failed — check the evaluation-service logs.</div>
       ) : (
         <div className={styles.latencyBlock}>
           {RAGAS_METRICS.map((m) => (

@@ -16,6 +16,7 @@ from deepeval.metrics import FaithfulnessMetric, AnswerRelevancyMetric, Contextu
 from deepeval.test_case import LLMTestCase
 from deepeval.dataset import EvaluationDataset
 from deepeval import evaluate
+from deepeval.models.base_model import DeepEvalBaseLLM
 from src.rag.core import get_llm
 from sqlalchemy.orm import joinedload
 from src.api.schema import PipelineScores,DeepEvalResponse,BenchmarkResultResponse,DeepEvalScores
@@ -24,6 +25,28 @@ import asyncio
 from src.database.models.benchmark import DatasetModel,BenchmarkModel
 from sqlalchemy.orm import joinedload
 from src.database.models.compare import ComparisonModel
+
+class LangchainModelAdapter(DeepEvalBaseLLM):
+    """DeepEval only accepts its own model types; wrap the LangChain chat model
+    so any provider (Gemini, Anthropic, ...) can be used as the eval model."""
+
+    def __init__(self, llm, name:str):
+        self.llm = llm
+        self.name = name
+
+    def load_model(self):
+        return self.llm
+
+    def generate(self, prompt:str) -> str:
+        return self.llm.invoke(prompt).content
+
+    async def a_generate(self, prompt:str) -> str:
+        response = await self.llm.ainvoke(prompt)
+        return response.content
+
+    def get_model_name(self) -> str:
+        return self.name
+
 
 def update_pipeline_status(db:Session,pipeline_id:str,status:str,error:str=None):
     pipeline = db.query(PipelineModel).filter(PipelineModel.id == pipeline_id).first()
@@ -43,8 +66,8 @@ async def build_benchmark_dataset(golden_set:list,config:PipelineConfig):
         test_case = LLMTestCase(input=item["question"],
                         expected_output=item["ground_truth"],
                         actual_output=answer,
-                        context=[c.content for c in result.chunks])
-        
+                        retrieval_context=[c.content for c in result.chunks])
+
         test_cases.append(test_case)
     dataset = EvaluationDataset()
     dataset.test_cases = test_cases
@@ -86,6 +109,18 @@ def ingest_task(config_dict:dict,object_name:str)->None:
 
 @shared_task(queue="evaluation")
 def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:dict,config_2_dict:dict):
+    try:
+        _run_deep_eval(comparison_id,result_id1,result_id2,config_1_dict,config_2_dict)
+    except Exception:
+        with get_sync_db() as db:
+            stmt = select(ComparisonModel).where(ComparisonModel.id == comparison_id)
+            comparison_row = db.execute(stmt).scalar_one_or_none()
+            if comparison_row:
+                comparison_row.status = "failed"
+        raise
+
+
+def _run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:dict,config_2_dict:dict):
 
     with get_sync_db() as db:
         stmt = (
@@ -94,7 +129,7 @@ def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:
             .where(PipelineResultModel.id == result_id1)
         )
         result = db.execute(stmt)
-        pipeline_result1 = result.scalar_one_or_none()
+        pipeline_result1 = result.unique().scalar_one_or_none()
 
 
         stmt = (
@@ -103,7 +138,7 @@ def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:
             .where(PipelineResultModel.id == result_id2)
         )
         result = db.execute(stmt)
-        pipeline_result2 = result.scalar_one_or_none()
+        pipeline_result2 = result.unique().scalar_one_or_none()
 
         pipeline_results = [pipeline_result1,pipeline_result2]
 
@@ -112,7 +147,7 @@ def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:
         for p in pipeline_results:
             test_case = LLMTestCase(input=p.query,
                                     actual_output=p.answer,
-                                    context=[chunk.content for chunk in p.chunks])
+                                    retrieval_context=[chunk.content for chunk in p.chunks])
             test_cases.append(test_case)
 
         dataset = EvaluationDataset()
@@ -120,13 +155,13 @@ def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:
 
         config1 = PipelineConfig.model_validate(config_1_dict)
         config2 = PipelineConfig.model_validate(config_2_dict)
-        eval_model = get_llm(config1)
+        eval_model = LangchainModelAdapter(get_llm(config1),config1.generation.llm)
 
+        # Contextual precision/recall need expected_output (ground truth),
+        # which ad-hoc comparisons don't have — only reference-free metrics here.
         metrics = [
             FaithfulnessMetric(threshold=0.7, model=eval_model),
             AnswerRelevancyMetric(threshold=0.7, model=eval_model),
-            ContextualPrecisionMetric(threshold=0.7, model=eval_model),
-            ContextualRecallMetric(threshold=0.7, model=eval_model)
         ]
 
         results = evaluate(test_cases=dataset.test_cases,metrics=metrics)
@@ -138,8 +173,6 @@ def run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict:
             pipeline_score = DeepEvalScores(
                 faithfulness=m_data[0].score,
                 answer_relevance=m_data[1].score,
-                context_precision=m_data[2].score,
-                context_recall=m_data[3].score
             )
             scores.append(pipeline_score)
 
@@ -174,7 +207,7 @@ def evaluate_single_pipeline(pipeline_id:str,dataset_id:str):
 
             dataset = asyncio.run(build_benchmark_dataset(golden_set=dataset_row.items,config=pipeline_config))
 
-        eval_model = get_llm(pipeline_config)
+        eval_model = LangchainModelAdapter(get_llm(pipeline_config),pipeline_config.generation.llm)
 
         metrics = [
             FaithfulnessMetric(threshold=0.7, model=eval_model),

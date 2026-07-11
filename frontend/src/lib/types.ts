@@ -113,8 +113,9 @@ export interface UploadResponse {
 
 export interface DeepEvalScores {
   faithfulness: number;
-  context_recall: number;
-  context_precision: number;
+  // null for ad-hoc comparisons — these metrics need a ground-truth dataset
+  context_recall: number | null;
+  context_precision: number | null;
   answer_relevance: number;
 }
 
@@ -134,6 +135,15 @@ export interface CompareStatusResponse {
     pipeline_a?: DeepEvalScores;
     pipeline_b?: DeepEvalScores;
   } | null;
+  result1: PipelineResult | null;
+  result2: PipelineResult | null;
+}
+
+export interface ComparisonListItem {
+  id: string;
+  query: string;
+  status: string;
+  created_at: string;
 }
 
 export interface DatasetItemCreate {
