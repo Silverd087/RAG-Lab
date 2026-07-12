@@ -1,0 +1,27 @@
+on:
+  push:
+    paths: ["backend/**"]
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: action/checkout@v4
+      - uses: astral-sh/setup-uv@8.3.2
+        with:
+          python-version: 3.13
+      - name: Unit tests
+        working-directory: backend
+        run: uv sync && uv run pytest ./tests/units
+
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: action/checkout@v4
+      - uses: astral-sh/setup-uv@8.3.2
+        with:
+          python-version: 3.13
+      - name: integration tests
+        working-directory: backend
+        run: uv sync && uv run pytest ./tests/integration
+      
