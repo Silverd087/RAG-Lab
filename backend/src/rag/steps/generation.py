@@ -7,7 +7,7 @@ from langchain_core.output_parsers import StrOutputParser
 def format_docs(docs:list[Document])->str:
     return "\n\n".join(doc.page_content for doc in docs)
 
-async def generate(query:str,docs:list[Document],config:PipelineConfig)->tuple[str,]:
+async def generate(query:str,docs:list[Document],config:PipelineConfig,stream=False)->tuple[str,]:
     trace ={}
     llm = get_llm(config)
     prompt = get_prompt(config)
@@ -18,6 +18,8 @@ async def generate(query:str,docs:list[Document],config:PipelineConfig)->tuple[s
         | StrOutputParser()
     )
     trace["context_sent_to_llm"] = context
-    answer = await chain.ainvoke({"question":query,"context":context})
-
-    return answer,trace
+    if stream:
+        return chain.astream({"question":query,"context":context}),trace
+    else:
+        answer = await chain.ainvoke({"question":query,"context":context})
+        return answer,trace

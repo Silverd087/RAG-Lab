@@ -16,6 +16,7 @@ import type {
   PipelineResult,
   PipelineStatus,
   PipelineUpdate,
+  StreamHandlers,
   UploadResponse,
 } from './types';
 
@@ -75,6 +76,42 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ query, session_id: sessionId ?? null }),
     }),
+  queryPipelineStream: async (id: string, query: string, sessionId: string, handlers: StreamHandlers) => {
+    const res = await fetch(`${BASE}/stream/pipelines/${id}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, session_id: sessionId }),
+    });
+    if (!res.ok || !res.body) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        detail = body.detail ? JSON.stringify(body.detail) : detail;
+      } catch {
+        /* ignore non-JSON error body */
+      }
+      throw new ApiError(res.status, detail);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split('\n\n');
+      buffer = frames.pop() ?? '';
+      for (const frame of frames) {
+        const line = frame.trim();
+        if (!line.startsWith('data:')) continue;
+        const event = JSON.parse(line.slice(5));
+        if (event.type === 'metadata') handlers.onMetadata?.(event);
+        else if (event.type === 'token') handlers.onToken?.(event.text);
+        else if (event.type === 'done') handlers.onDone?.(event);
+        else if (event.type === 'error') handlers.onError?.(event.detail);
+      }
+    }
+  },
   getPipelineResults: (id: string) => request<PipelineResult[]>(`/pipelines/${id}/results`),
 
   compare: (pipeline_id1: string, pipeline_id2: string, query: string) =>

@@ -111,6 +111,24 @@ export interface UploadResponse {
   job_id: string;
 }
 
+export interface StreamMetadataEvent {
+  chunks: ChunkTrace[];
+  query_variants: string[] | null;
+  query_translation: string | null;
+}
+
+export interface StreamDoneEvent {
+  result_id: string;
+  latency: Record<string, number>;
+}
+
+export interface StreamHandlers {
+  onMetadata?: (meta: StreamMetadataEvent) => void;
+  onToken?: (text: string) => void;
+  onDone?: (done: StreamDoneEvent) => void;
+  onError?: (detail: string) => void;
+}
+
 export interface DeepEvalScores {
   faithfulness: number;
   // null for ad-hoc comparisons — these metrics need a ground-truth dataset

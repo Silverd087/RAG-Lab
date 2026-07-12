@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/Button';
 import { Select } from '../../components/Select';
 import { StatusPill } from '../../components/StatusPill';
@@ -17,6 +17,10 @@ interface Message {
   text: string;
   result?: PipelineResult;
   showSources?: boolean;
+  /** true while tokens are still arriving over the wire */
+  streaming?: boolean;
+  /** false until the typewriter reveal has caught up with the full answer */
+  revealed?: boolean;
 }
 
 interface Session {
@@ -79,15 +83,27 @@ export function QueryPlayground() {
   const messages = activeSession?.messages ?? [];
   const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
 
-  const queryMutation = useMutation({
-    mutationFn: ({ query, sessionId }: { query: string; sessionId: string }) =>
-      api.queryPipeline(effectivePipelineId, query, sessionId),
-    onError: (err) => flash(err instanceof Error ? err.message : 'Query failed', 'var(--red)'),
-  });
+  const [isStreaming, setIsStreaming] = useState(false);
 
-  function send() {
+  function updateLastAssistant(sessionId: string, updater: (m: Message) => Message) {
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== sessionId) return s;
+        const msgs = [...s.messages];
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          if (msgs[i].role === 'assistant') {
+            msgs[i] = updater(msgs[i]);
+            break;
+          }
+        }
+        return { ...s, messages: msgs };
+      }),
+    );
+  }
+
+  async function send() {
     const query = input.trim();
-    if (!query || !effectivePipelineId) return;
+    if (!query || !effectivePipelineId || isStreaming) return;
     setInput('');
 
     const existingSession = allSessions.find((s) => s.id === activeSessionId && s.pipelineId === effectivePipelineId);
@@ -106,23 +122,88 @@ export function QueryPlayground() {
         next = [newSession, ...prev];
       }
       return next.map((s) =>
-        s.id === sessionId ? { ...s, messages: [...s.messages, { role: 'user', text: query }], time: new Date().toISOString() } : s,
+        s.id === sessionId
+          ? {
+              ...s,
+              messages: [
+                ...s.messages,
+                { role: 'user', text: query },
+                { role: 'assistant', text: '', streaming: true, revealed: false },
+              ],
+              time: new Date().toISOString(),
+            }
+          : s,
       );
     });
     setActiveSessionId(sessionId);
 
-    queryMutation.mutate({ query, sessionId }, {
-      onSuccess: (result) => {
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === sessionId
-              ? { ...s, messages: [...s.messages, { role: 'assistant', text: result.answer, result }] }
-              : s,
-          ),
-        );
-        queryClient.invalidateQueries({ queryKey: ['pipeline-results', effectivePipelineId] });
-      },
-    });
+    const baseResult: PipelineResult = {
+      id: null,
+      pipeline_id: effectivePipelineId,
+      session_id: sessionId,
+      created_at: null,
+      query,
+      query_variants: null,
+      translated_query: null,
+      chunks: [],
+      answer: '',
+      latency: {},
+    };
+
+    setIsStreaming(true);
+    try {
+      await api.queryPipelineStream(effectivePipelineId, query, sessionId, {
+        onMetadata: (meta) => {
+          updateLastAssistant(sessionId, (m) => ({
+            ...m,
+            result: {
+              ...(m.result ?? baseResult),
+              chunks: meta.chunks,
+              query_variants: meta.query_variants,
+              translated_query: meta.query_translation,
+            },
+          }));
+        },
+        onToken: (text) => {
+          updateLastAssistant(sessionId, (m) => ({ ...m, text: m.text + text }));
+        },
+        onDone: (done) => {
+          updateLastAssistant(sessionId, (m) => ({
+            ...m,
+            result: {
+              ...(m.result ?? baseResult),
+              id: done.result_id,
+              answer: m.text,
+              latency: done.latency,
+            },
+          }));
+          queryClient.invalidateQueries({ queryKey: ['pipeline-results', effectivePipelineId] });
+        },
+        onError: (detail) => {
+          flash(detail, 'var(--red)');
+          updateLastAssistant(sessionId, (m) => (m.text ? m : { ...m, text: `⚠ ${detail}` }));
+        },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Query failed';
+      flash(msg, 'var(--red)');
+      updateLastAssistant(sessionId, (m) => (m.text ? m : { ...m, text: `⚠ ${msg}` }));
+    } finally {
+      updateLastAssistant(sessionId, (m) => ({ ...m, streaming: false }));
+      setIsStreaming(false);
+    }
+  }
+
+  function markRevealed(index: number) {
+    const active = activeSession;
+    if (!active) return;
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id !== active.id
+          ? s
+          : { ...s, messages: s.messages.map((m, i) => (i === index ? { ...m, revealed: true } : m)) },
+      ),
+    );
   }
 
   function toggleSources(index: number) {
@@ -141,7 +222,10 @@ export function QueryPlayground() {
     });
   }
 
-  const chunkPanel = useMemo(() => lastAssistant?.result?.chunks ?? [], [lastAssistant]);
+  const chunkPanel = useMemo(
+    () => (lastAssistant?.revealed === false ? [] : (lastAssistant?.result?.chunks ?? [])),
+    [lastAssistant],
+  );
 
   return (
     <div className={styles.wrap}>
@@ -188,63 +272,20 @@ export function QueryPlayground() {
           {messages.length === 0 && (
             <div className={styles.muted}>Ask a question to start a conversation with this pipeline.</div>
           )}
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? styles.userBubble : styles.assistantBubble}>
-              {m.role === 'user' ? (
-                m.text
-              ) : (
-                <>
-                  <div dangerouslySetInnerHTML={{ __html: renderMarkdownLite(m.text) }} />
-                  {m.result && (
-                    <>
-                      <div className={styles.assistantMeta}>
-                        Retrieved {m.result.latency.retrieval_ms ?? 0}ms · Generated{' '}
-                        {((m.result.latency.generation_ms ?? 0) / 1000).toFixed(1)}s
-                        {m.result.chunks.length > 0 && (
-                          <button className={styles.sourcesToggle} onClick={() => toggleSources(i)}>
-                            {m.showSources ? 'Hide sources' : 'View sources'}
-                          </button>
-                        )}
-                      </div>
-                      {m.result.translated_query && (
-                        <div className={styles.subPanel}>
-                          <div className={styles.subPanelLabel}>Translated query</div>
-                          {m.result.translated_query}
-                        </div>
-                      )}
-                      {m.result.query_variants && m.result.query_variants.length > 0 && (
-                        <div className={styles.subPanel}>
-                          <div className={styles.subPanelLabel}>Query variants</div>
-                          {m.result.query_variants.map((v) => (
-                            <div key={v}>{v}</div>
-                          ))}
-                        </div>
-                      )}
-                      {m.showSources && (
-                        <div className={styles.inlineChunks}>
-                          {m.result.chunks.map((c, ci) => (
-                            <ChunkCard key={ci} chunk={c} />
-                          ))}
-                        </div>
-                      )}
-                      <div className={styles.feedbackRow}>
-                        <button className={styles.feedbackBtn} onClick={() => flash('Feedback recorded')}>
-                          <IconThumbsUp width={14} height={14} />
-                        </button>
-                        <button className={styles.feedbackBtn} onClick={() => flash('Feedback recorded')}>
-                          <IconThumbsDown width={14} height={14} />
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-          {queryMutation.isPending && (
-            <div className={styles.assistantBubble}>
-              <TypingIndicator />
-            </div>
+          {messages.map((m, i) =>
+            m.role === 'user' ? (
+              <div key={i} className={styles.userBubble}>
+                {m.text}
+              </div>
+            ) : (
+              <AssistantBubble
+                key={i}
+                m={m}
+                onToggleSources={() => toggleSources(i)}
+                onRevealed={() => markRevealed(i)}
+                onFeedback={() => flash('Feedback recorded')}
+              />
+            ),
           )}
         </div>
         <div className={styles.inputBar}>
@@ -258,7 +299,7 @@ export function QueryPlayground() {
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();
             }}
           />
-          <Button variant="primary" onClick={send} disabled={!input.trim() || queryMutation.isPending}>
+          <Button variant="primary" onClick={send} disabled={!input.trim() || isStreaming}>
             Send
           </Button>
           <span className={styles.hint}>⌘⏎ to send</span>
@@ -272,6 +313,95 @@ export function QueryPlayground() {
           <ChunkCard key={i} chunk={c} />
         ))}
       </aside>
+    </div>
+  );
+}
+
+function AssistantBubble({
+  m,
+  onToggleSources,
+  onRevealed,
+  onFeedback,
+}: {
+  m: Message;
+  onToggleSources: () => void;
+  onRevealed: () => void;
+  onFeedback: () => void;
+}) {
+  // Typewriter reveal: display a prefix of the full text and steadily catch up.
+  // Messages loaded from history mount fully revealed; streaming ones start at 0.
+  const [visible, setVisible] = useState(() => (m.streaming ? 0 : m.text.length));
+  const caughtUp = visible >= m.text.length;
+
+  useEffect(() => {
+    if (caughtUp) return;
+    const timer = setInterval(() => {
+      // reveal faster the further behind we are, min one char per tick
+      setVisible((v) => Math.min(m.text.length, v + Math.max(1, Math.ceil((m.text.length - v) / 30))));
+    }, 16);
+    return () => clearInterval(timer);
+  }, [caughtUp, m.text]);
+
+  useEffect(() => {
+    if (caughtUp && !m.streaming && m.revealed === false) onRevealed();
+  }, [caughtUp, m.streaming, m.revealed, onRevealed]);
+
+  const displayText = m.text.slice(0, visible);
+  const showMeta = m.result && m.revealed !== false;
+
+  return (
+    <div className={styles.assistantBubble}>
+      {displayText === '' ? (
+        <TypingIndicator />
+      ) : (
+        <div dangerouslySetInnerHTML={{ __html: renderMarkdownLite(displayText) }} />
+      )}
+      {showMeta && m.result && (
+        <>
+          <div className={styles.assistantMeta}>
+            {m.result.latency.generation_ms != null && (
+              <>
+                Retrieved {m.result.latency.retrieval_ms ?? 0}ms · Generated{' '}
+                {((m.result.latency.generation_ms ?? 0) / 1000).toFixed(1)}s
+              </>
+            )}
+            {m.result.chunks.length > 0 && (
+              <button className={styles.sourcesToggle} onClick={onToggleSources}>
+                {m.showSources ? 'Hide sources' : 'View sources'}
+              </button>
+            )}
+          </div>
+          {m.result.translated_query && (
+            <div className={styles.subPanel}>
+              <div className={styles.subPanelLabel}>Translated query</div>
+              {m.result.translated_query}
+            </div>
+          )}
+          {m.result.query_variants && m.result.query_variants.length > 0 && (
+            <div className={styles.subPanel}>
+              <div className={styles.subPanelLabel}>Query variants</div>
+              {m.result.query_variants.map((v) => (
+                <div key={v}>{v}</div>
+              ))}
+            </div>
+          )}
+          {m.showSources && (
+            <div className={styles.inlineChunks}>
+              {m.result.chunks.map((c, ci) => (
+                <ChunkCard key={ci} chunk={c} />
+              ))}
+            </div>
+          )}
+          <div className={styles.feedbackRow}>
+            <button className={styles.feedbackBtn} onClick={onFeedback}>
+              <IconThumbsUp width={14} height={14} />
+            </button>
+            <button className={styles.feedbackBtn} onClick={onFeedback}>
+              <IconThumbsDown width={14} height={14} />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

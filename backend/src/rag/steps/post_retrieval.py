@@ -1,5 +1,4 @@
 
-import math
 from src.rag.models import PipelineConfig
 from langchain_classic.docstore.document import Document
 from src.rag.models import RerankerConfig
@@ -14,9 +13,8 @@ async def post_retrieval(config:PipelineConfig,trace:dict,query:str,docs:list[Do
     if config.post_retrieval.reranker == RerankerConfig.RECIPROCAL_RANK_FUSION and config.query_translation.multi_query:
         raw_results = trace["raw_results"]
         if raw_results:
-            docs,scores = _rrf_score(all_results=raw_results,top_n=config.post_retrieval.top_n)
+            docs = _rrf_score(all_results=raw_results,top_n=config.post_retrieval.top_n)
             post_trace["rrf_applied"] = True
-            post_trace["reranked_chunks"] = scores
 
     elif config.post_retrieval.reranker == RerankerConfig.COHERE:
         docs,scores = _cohere_rerank(config,docs,query)
@@ -65,14 +63,11 @@ def _cross_encoder_rerank(config:PipelineConfig,query:str,docs:list[Document])->
     result_docs = []
     result_scores = []
     for score,doc in scored[:config.post_retrieval.top_n]:
-        # ms-marco cross-encoders output raw logits; sigmoid maps them to a
-        # 0-1 relevance probability without changing the ranking order.
-        prob = 1/(1+math.exp(-float(score)))
-        doc.metadata["rerank_score"] = prob
+        doc.metadata["rerank_score"] = float(score)
         result_docs.append(doc)
         result_scores.append({
             "content": doc.page_content,
-            "rerank_score":prob,
+            "rerank_score":float(score),
             "source": doc.metadata.get("source"),
             "page": doc.metadata.get("page"),
             "retrieved_by": doc.metadata.get("retrieved_by"),
@@ -100,7 +95,7 @@ def _deduplicate(all_result:list[Document])->list[Document]:
 
 
 
-def _rrf_score(all_results:list[list],top_n:int=5,k:int=60)->tuple[list[Document],list[dict]]:
+def _rrf_score(all_results:list[list],top_n:int=5,k:int=60)->list:
     scores: dict[str, float] = {}
     doc_map: dict[str, Document] = {}
     for docs in all_results:
@@ -110,18 +105,5 @@ def _rrf_score(all_results:list[list],top_n:int=5,k:int=60)->tuple[list[Document
             doc_map[key] = doc
     # return top_n sorted by score
     sorted_keys = sorted(scores, key=lambda x: scores[x], reverse=True)
-    result_docs = []
-    result_scores = []
-    for key in sorted_keys[:top_n]:
-        doc = doc_map[key]
-        doc.metadata["rerank_score"] = float(scores[key])
-        result_docs.append(doc)
-        result_scores.append({
-            "content": doc.page_content,
-            "rerank_score": float(scores[key]),
-            "source": doc.metadata.get("source"),
-            "page": doc.metadata.get("page"),
-            "retrieved_by": doc.metadata.get("retrieved_by"),
-        })
-    return result_docs,result_scores
+    return [doc_map[k] for k in sorted_keys[:top_n]]
     

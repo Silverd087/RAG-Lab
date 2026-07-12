@@ -16,7 +16,7 @@ COPY pyproject.toml uv.lock ./
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-RUN uv sync --frozen --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
 
 COPY . .
 
@@ -59,13 +59,14 @@ RUN mkdir -p /home/appuser && \
 
 USER appuser
 
-USER appuser
-
+# Copy the venv and the source separately: the multi-GB venv layer stays
+# cached across code changes, and the venv is not duplicated into the image.
 COPY --chown=appuser:appuser --from=builder /app/.venv ./.venv
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-COPY --chown=appuser:appuser --from=builder /app /app
+COPY --chown=appuser:appuser --from=builder /app/src ./src
+COPY --chown=appuser:appuser --from=builder /app/config.py ./config.py
 
 EXPOSE 8000
 

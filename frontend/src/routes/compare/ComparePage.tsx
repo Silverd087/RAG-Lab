@@ -61,6 +61,11 @@ export function ComparePage() {
   });
 
   async function openComparison(comparisonId: string) {
+    // Clicking the open comparison again closes it.
+    if (result?.id === comparisonId) {
+      setResult(null);
+      return;
+    }
     try {
       const detail = await api.getCompareStatus(comparisonId);
       if (!detail.result1 || !detail.result2) {
@@ -206,7 +211,7 @@ function ResultColumn({
         })}
       </div>
 
-      <div className={styles.sectionLabel}>RAGAS evaluation</div>
+      <div className={styles.sectionLabel}>DEEPEVAL evaluation</div>
       {evaluationDone && scores ? (
         <div className={styles.latencyBlock}>
           {RAGAS_METRICS.map((m) => {
