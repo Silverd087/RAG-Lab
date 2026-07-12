@@ -20,7 +20,7 @@ jobs:
         run: uv sync
       - name: Unit tests
         working-directory: backend
-        run: uv run pytest ./tests/units
+        run: uv run pytest tests/units
 
   integration-test:
     needs: unit-test
@@ -56,5 +56,5 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ${{secrets.postgres_password}}
           POSTGRES_TEST_DB: RagLabTest
-        run: uv run pytest ./tests/integration
+        run: uv run pytest tests/integration
       
