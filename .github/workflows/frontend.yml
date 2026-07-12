@@ -1,3 +1,4 @@
+name: Frontend CI
 on:
   push: 
     paths: ["/frontend/**"]
