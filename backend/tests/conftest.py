@@ -1,3 +1,31 @@
+import os
+from pathlib import Path
+
+# Must run before any src/config import below: config.Settings() is built at
+# import time and fails if these variables are missing (e.g. in CI, where
+# there is no .env). setdefault never overrides values CI provides explicitly.
+_MOCK_ENV = {
+    "GOOGLE_API_KEY": "mock-google-key",
+    "COHERE_API_KEY": "mock-cohere-key",
+    "ANTHROPIC_API_KEY": "mock-anthropic-key",
+    "VOYAGE_API_KEY": "mock-voyage-key",
+    "MINIO_ROOT_USER": "minio_admin",
+    "MINIO_ROOT_PASSWORD": "minio_password",
+    "MINIO_BUCKET_NAME": "test-bucket",
+}
+# Postgres credentials are real (integration tests connect to them), so only
+# default them when there is no .env to supply the local values.
+# Settings resolves env_file=".env" against the CWD, so check the same path.
+if not Path(".env").exists():
+    _MOCK_ENV.update({
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": "postgres",
+        "POSTGRES_DB": "RagLab",
+        "POSTGRES_TEST_DB": "RagLabTest",
+    })
+for _key, _value in _MOCK_ENV.items():
+    os.environ.setdefault(_key, _value)
+
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine,async_sessionmaker, AsyncSession
 from src.database.models.base import Base
@@ -20,16 +48,6 @@ import uuid
 from datetime import datetime,timezone
 from src.database.models.benchmark import BenchmarkModel
 from src.api.schema import BenchmarkResultResponse
-import os
-
-
-os.environ.setdefault("GOOGLE_API_KEY", "mock-google-key")
-os.environ.setdefault("COHERE_API_KEY", "mock-cohere-key")
-os.environ.setdefault("ANTHROPIC_API_KEY", "mock-anthropic-key")
-os.environ.setdefault("VOYAGE_API_KEY", "mock-voyage-key")
-os.environ.setdefault("MINIO_ROOT_USER", "minio_admin")
-os.environ.setdefault("MINIO_ROOT_PASSWORD", "minio_password")
-os.environ.setdefault("MINIO_BUCKET_NAME", "test-bucket")
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -54,12 +72,6 @@ async def session_factory(test_engine):
         class_=AsyncSession,
         expire_on_commit=False
     )
-
-@pytest_asyncio.fixture(autouse=True)
-async def clean_db(test_engine):
-    yield
-    async with test_engine.begin() as conn:
-        await conn.execute(text("TRUNCATE chunk_traces, pipeline_results, pipeline_config, datasets, dataset_items, benchmarks, comparisons RESTART IDENTITY CASCADE"))
 
 @pytest_asyncio.fixture
 async def db_session(session_factory):
