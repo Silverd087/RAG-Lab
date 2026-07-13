@@ -33,7 +33,7 @@ jobs:
         run: npm ci
       - name: lint
         working-directory: frontend
-        run: npx eslint src
+        run: npm run lint
   build:
     needs: [typecheck,lint]
     runs-on: ubuntu-latest
