@@ -33,7 +33,7 @@ jobs:
         run: npm ci
       - name: lint
         working-directory: frontend
-        run: npx eslint /src
+        run: npx eslint src
   build:
     needs: [typecheck,lint]
     runs-on: ubuntu-latest
@@ -43,7 +43,9 @@ jobs:
         with:
           node-version: 20
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      - name: install dependencies
+        working-directory: frontend
+        run: npm ci
       - name: build
         working-directory: frontend
         run: npm run build
