@@ -102,10 +102,10 @@ class TestCreatePipeline:
         payload_a = pipeline_config_a.model_dump(mode="json")
         payload_b = pipeline_config_b.model_dump(mode="json")
 
-        response_a = client.post(f"/api/v1/pipelines",json=payload_a)
-        response_b = client.post(f"/api/v1/pipelines",json=payload_b)
-
-        result_a,result_b = await asyncio.gather(response_a,response_b)
+        # Sequential on purpose: all requests share one test AsyncSession
+        # (see the client fixture), which can't serve concurrent queries.
+        result_a = await client.post(f"/api/v1/pipelines",json=payload_a)
+        result_b = await client.post(f"/api/v1/pipelines",json=payload_b)
 
         data_a = result_a.json()
         data_b = result_b.json()

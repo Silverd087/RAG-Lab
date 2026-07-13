@@ -104,7 +104,7 @@ class GenerationConfig(BaseModel):
 
 class PipelineConfig(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
-    id: Optional[UUID4] = None
+    id: Optional[UUID4] = Field(default_factory=uuid4)
     name: str = Field(min_length=1)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: PipelineStatus = PipelineStatus.DRAFT

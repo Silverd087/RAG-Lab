@@ -103,14 +103,16 @@ class TestQueryHistory:
         assert all("query" in data[i] for i in range(len(data)))
         assert all(isinstance(data[i]["query"],str) for i in range(len(data)))
 
-    async def test_get_query_history_nonexistent_pipeline_returns_404(self,client):
+    async def test_get_query_history_nonexistent_pipeline_returns_empty_list(self,client):
         id = uuid.uuid4()
         response = await client.get(f"/api/v1/pipelines/{id}/results")
-        assert response.status_code == 404
+        assert response.status_code == 200
+        assert response.json() == []
 
-    async def test_get_query_history_empty_when_no_queries_returns_404(self,client,ready_pipeline):
+    async def test_get_query_history_empty_when_no_queries_returns_empty_list(self,client,ready_pipeline):
         response = await client.get(f"/api/v1/pipelines/{ready_pipeline["id"]}/results")
-        assert response.status_code == 404
+        assert response.status_code == 200
+        assert response.json() == []
 
 
 

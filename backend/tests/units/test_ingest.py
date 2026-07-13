@@ -1,5 +1,5 @@
 import pytest
-from src.rag.ingest import ensure_collection, run_ingest
+from src.rag.ingest import ensure_collection, run_ingest, merge_elements_by_page
 
 
 class TestEnsureCollection:
@@ -37,7 +37,8 @@ class TestRunIngest:
     def test_default_flow_splits_then_indexes_chunks(self, mock_document_loader, mock_get_splitter, mock_get_vectorstore, base_config, fake_docs):
         mock_get_splitter.split_documents.return_value = fake_docs
         run_ingest("doc.pdf", base_config)
-        mock_get_splitter.split_documents.assert_called_once_with(fake_docs)
+        merged_docs = merge_elements_by_page(fake_docs, "doc.pdf")
+        mock_get_splitter.split_documents.assert_called_once_with(merged_docs)
         mock_get_vectorstore.add_documents.assert_called_once_with(fake_docs)
 
     def test_default_flow_does_not_use_parent_retriever(self, mock_get_parent_doc_retriever, base_config):
@@ -46,7 +47,8 @@ class TestRunIngest:
 
     def test_parent_doc_flow_uses_parent_retriever(self, mock_get_parent_doc_retriever, mock_get_vectorstore, parent_rerank_config, fake_docs):
         run_ingest("doc.pdf", parent_rerank_config)
-        mock_get_parent_doc_retriever.add_documents.assert_called_once_with(fake_docs)
+        merged_docs = merge_elements_by_page(fake_docs, "doc.pdf")
+        mock_get_parent_doc_retriever.add_documents.assert_called_once_with(merged_docs)
         mock_get_vectorstore.add_documents.assert_not_called()
 
     def test_ensures_collection_before_indexing(self, mock_get_client, base_config):

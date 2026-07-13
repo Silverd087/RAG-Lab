@@ -20,6 +20,16 @@ import uuid
 from datetime import datetime,timezone
 from src.database.models.benchmark import BenchmarkModel
 from src.api.schema import BenchmarkResultResponse
+import os
+
+
+os.environ.setdefault("GOOGLE_API_KEY", "mock-google-key")
+os.environ.setdefault("COHERE_API_KEY", "mock-cohere-key")
+os.environ.setdefault("ANTHROPIC_API_KEY", "mock-anthropic-key")
+os.environ.setdefault("VOYAGE_API_KEY", "mock-voyage-key")
+os.environ.setdefault("MINIO_ROOT_USER", "minio_admin")
+os.environ.setdefault("MINIO_ROOT_PASSWORD", "minio_password")
+os.environ.setdefault("MINIO_BUCKET_NAME", "test-bucket")
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -29,7 +39,7 @@ def event_loop():
 
 @pytest_asyncio.fixture(scope="session")
 async def test_engine():
-    engine = create_async_engine(url=f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}@{settings.postgres_host}/{settings.postgres_test_db}",poolclass=NullPool)
+    engine = create_async_engine(url=f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}@localhost/{settings.postgres_test_db}",poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
@@ -278,8 +288,9 @@ async def two_ready_pipelines(client: AsyncClient) -> tuple[dict, dict]:
 @pytest.fixture(autouse=True)
 def mock_minio_client(mocker):
     id = uuid.uuid4()
+    # The real minio SDK is synchronous — AsyncMock here would hand the
+    # routes un-awaited coroutines instead of results.
     minio_client = MagicMock()
-    minio_client.put_object = AsyncMock()
     minio_client.put_object.return_value = True
 
     prefix = f"pipelines/{id}/"
@@ -293,7 +304,7 @@ def mock_minio_client(mocker):
     obj2.size = 1024 * 1200
     obj2.last_modified = datetime(2026, 4, 1, 14, 15)
     
-    minio_client.list_objects = AsyncMock(return_value=[obj1,obj2])
+    minio_client.list_objects.return_value = [obj1,obj2]
     mocker.patch("src.storage.minio_client.Minio",return_value=minio_client)
     mocker.patch("src.storage.minio_client._minio_client", None)
 

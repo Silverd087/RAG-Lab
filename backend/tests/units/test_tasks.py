@@ -96,7 +96,7 @@ class TestBuildBenchmarkDataset:
         assert test_case.input == "q1"
         assert test_case.expected_output == "gt1"
         assert test_case.actual_output == "the answer"
-        assert test_case.context == [doc.page_content for doc in fake_docs]
+        assert test_case.retrieval_context == [doc.page_content for doc in fake_docs]
 
 
 class TestIngestTask:
@@ -174,9 +174,9 @@ class TestRunDeepEval:
     @pytest.fixture
     def deep_eval_db(self, mock_db, pipeline_result_rows, comparison_row):
         result_1 = MagicMock()
-        result_1.scalar_one_or_none.return_value = pipeline_result_rows[0]
+        result_1.unique.return_value.scalar_one_or_none.return_value = pipeline_result_rows[0]
         result_2 = MagicMock()
-        result_2.scalar_one_or_none.return_value = pipeline_result_rows[1]
+        result_2.unique.return_value.scalar_one_or_none.return_value = pipeline_result_rows[1]
         result_3 = MagicMock()
         result_3.scalar_one_or_none.return_value = comparison_row
         mock_db.execute.side_effect = [result_1, result_2, result_3]
@@ -185,7 +185,7 @@ class TestRunDeepEval:
     def test_stores_scores_and_completes_comparison(self, mocker, deep_eval_db, comparison_row, mock_metrics, base_config, hyde_config):
         mocker.patch(
             "src.api.task.evaluate",
-            return_value=make_eval_results([[0.9, 0.8, 0.7, 0.6], [0.5, 0.4, 0.3, 0.2]]),
+            return_value=make_eval_results([[0.9, 0.8], [0.5, 0.4]]),
         )
         run_deep_eval(
             comparison_id="comparison-id",
@@ -198,14 +198,14 @@ class TestRunDeepEval:
         assert comparison_row.evaluation_scores["pipeline_a"] == {
             "faithfulness": 0.9,
             "answer_relevance": 0.8,
-            "context_precision": 0.7,
-            "context_recall": 0.6,
+            "context_precision": None,
+            "context_recall": None,
         }
         assert comparison_row.evaluation_scores["pipeline_b"] == {
             "faithfulness": 0.5,
             "answer_relevance": 0.4,
-            "context_precision": 0.3,
-            "context_recall": 0.2,
+            "context_precision": None,
+            "context_recall": None,
         }
 
     def test_evaluates_one_test_case_per_pipeline_result(self, mocker, deep_eval_db, mock_metrics, base_config, hyde_config):
