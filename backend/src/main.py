@@ -61,7 +61,7 @@ async def health(request:Request,response:Response):
         checks["minio"] = "healthy"
     except:
         checks["minio"] = "unhealthy"
-
+ 
     try:
         with celery_app.connection_for_write() as connection:
             connection.connect()
