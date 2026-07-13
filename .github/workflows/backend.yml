@@ -41,7 +41,7 @@ jobs:
           - 5432:5432
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@8.3.2
+      - uses: astral-sh/setup-uv@v8.3.2
         with:
           python-version: 3.13
           enable-cache: true
@@ -54,7 +54,7 @@ jobs:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ${{secrets.postgres_password}}
+          POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD}}
           POSTGRES_TEST_DB: RagLabTest
         run: uv run pytest tests/integration
       
