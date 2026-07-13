@@ -61,6 +61,7 @@ RUN mkdir -p /home/appuser && \
 
 USER appuser
 
+
 # Copy the venv and the source separately: the multi-GB venv layer stays
 # cached across code changes, and the venv is not duplicated into the image.
 COPY --chown=appuser:appuser --from=builder /app/.venv ./.venv
