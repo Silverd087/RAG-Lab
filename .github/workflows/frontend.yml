@@ -1,0 +1,47 @@
+name: Frontend CI
+on:
+  push: 
+    paths: ["/frontend/**"]
+  pull_request:
+    paths: ["/frontend/**"]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: action/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: action/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: lint
+        working-directory: frontend
+        run: npx eslint /src
+  build:
+    needs: [typecheck,lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: action/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: build
+        working-directory: frontend
+        run: npm run build
+      
+  

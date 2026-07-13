@@ -1,0 +1,60 @@
+name: Backend CI
+
+on:
+  push:
+    paths: ["backend/**"]
+  pull_request:
+    paths: ["backend/**"]
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@8.3.2
+        with:
+          python-version: 3.13
+          enable-caching: true
+      - name: install dependencies
+        working-directory: backend
+        run: uv sync
+      - name: Unit tests
+        working-directory: backend
+        run: uv run pytest tests/units
+
+  integration-test:
+    needs: unit-test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: ${{secrets.postgres_password}}
+          POSTGRES_DB: RagLabTest
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports: 
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@8.3.2
+        with:
+          python-version: 3.13
+          enable-caching: true
+      - name: install dependencies
+        working-directory: backend
+        run: uv sync
+      - name: integration tests
+        working-directory: backend
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{secrets.postgres_password}}
+          POSTGRES_TEST_DB: RagLabTest
+        run: uv run pytest tests/integration
+      
