@@ -55,7 +55,9 @@ RUN mkdir -p /home/appuser && \
     --no-create-home \
     --uid "${UID}" \
     appuser && \
-    chown -R appuser:appuser /home/appuser
+    chown -R appuser:appuser /home/appuser && \
+    # deepeval creates a .deepeval cache dir in the CWD at import time
+    chown appuser:appuser /app
 
 USER appuser
 
