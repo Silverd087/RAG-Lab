@@ -35,8 +35,14 @@ app.include_router(compare.router, prefix=PREFIX)
 app.include_router(dataset.router, prefix=PREFIX)
 app.include_router(benchmark.router, prefix=PREFIX)
 
-@app.get("/health")
-async def health(request:Request,response:Response):
+@app.get("/healthz")
+async def health():
+    return {
+        "status": "healthy"
+    }
+
+@app.get("/readyz")
+async def ready(request:Request,response:Response):
     start_time = time.time()
     
     checks = {
