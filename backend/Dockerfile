@@ -1,6 +1,6 @@
 ARG PYTHON_VERSION=3.13.5
 
-FROM python:${PYTHON_VERSION} as builder
+FROM python:${PYTHON_VERSION} AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1
 
@@ -22,7 +22,7 @@ COPY . .
 
 
 
-FROM  python:${PYTHON_VERSION}-slim as runtime
+FROM  python:${PYTHON_VERSION}-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1
 

@@ -49,5 +49,65 @@ jobs:
       - name: build
         working-directory: frontend
         run: npm run build
+  build-and-push:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: checkout github actions
+        uses: actions/checkout@v4
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+      - name:  Docker meta
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images:  ghcr.io/silverd087/raglab-frontend
+          tags: |
+            type=sha,format=short
+      - name: Build and push docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+
+  update-manifests:
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: infra-repo-update
+      cancel-in-progress: false
+    steps:
+      - name: checkout infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: silverd087/RAG-Lab-Infra
+          token: ${{ secrets.DEPLOY_REPO_PAT }}
+          path: infrastructure-repo
+      - uses: imranismail/setup-kustomize@v2
+      - name: update kustomize image Tag
+        working-directory: infrastructure-repo/overlays/dev
+        run: kustomize edit set image ghcr.io/silverd087/raglab-frontend=ghcr.io/silverd087/raglab-frontend:${{  needs.build-and-push.outputs.image_version }}
       
+      - name: commit changes
+        working-directory: infrastructure-repo
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git diff --quiet || git commit -am "raglab-frontend ${{ needs.build-and-push.outputs.image_version }}"
+          git pull --rebase
+          git push
   
