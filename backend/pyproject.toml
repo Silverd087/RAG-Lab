@@ -25,6 +25,7 @@ dependencies = [
     "langchain-unstructured>=1.0.1",
     "langchain-voyageai>=0.4.0",
     "minio>=7.2.20",
+    "prometheus-fastapi-instrumentator>=8.0.2",
     "psycopg2-binary>=2.9.12",
     "python-multipart>=0.0.32",
     "qdrant-client>=1.18.0",

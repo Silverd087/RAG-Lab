@@ -10,6 +10,7 @@ import time
 from sqlalchemy import text
 from src.celery_app import celery_app
 from datetime import datetime
+from prometheus_fastapi_instrumentator import Instrumentator
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     app.state.qdrant_client.close()
 
 app = FastAPI(title="RAG Lab", lifespan=lifespan)
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 PREFIX = "/api/v1"
 
@@ -92,7 +94,7 @@ async def ready(request:Request,response:Response):
         else:
             checks["qdrant"] = "unhealthy"
     except:
-        checks["qdrant"] = "healthy"
+        checks["qdrant"] = "unhealthy"
 
     all_healthy = all(status == "healthy" for status in checks.values())
 
