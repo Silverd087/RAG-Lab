@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     app.state.redis_client.close()
     app.state.qdrant_client.close()
 
-app = FastAPI(title="RAG Lab", lifespan=lifespan)
+app = FastAPI(title="RAG Lab", lifespan=lifespan) 
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 PREFIX = "/api/v1"

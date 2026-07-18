@@ -8,6 +8,7 @@ import { ScoreBar } from '../../components/ScoreBar';
 import { IconPlus, IconThumbsDown, IconThumbsUp } from '../../components/Icons';
 import { api } from '../../lib/api';
 import { renderMarkdownLite, timeAgo } from '../../lib/format';
+import { randomUUID } from '../../lib/uuid';
 import { useToast } from '../../components/Toast';
 import type { ChunkTrace, PipelineResult } from '../../lib/types';
 import styles from './QueryPlayground.module.css';
@@ -107,7 +108,7 @@ export function QueryPlayground() {
     setInput('');
 
     const existingSession = allSessions.find((s) => s.id === activeSessionId && s.pipelineId === effectivePipelineId);
-    const sessionId = existingSession ? existingSession.id : crypto.randomUUID();
+    const sessionId = existingSession ? existingSession.id : randomUUID();
     setSessions((prev) => {
       let next = prev;
       if (!prev.find((s) => s.id === sessionId)) {
