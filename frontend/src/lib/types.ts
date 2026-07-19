@@ -81,9 +81,11 @@ export type CreatePipelineInput = {
   generation?: Partial<Omit<GenerationConfig, 'prompt'>> & { prompt?: Partial<Prompt> };
 };
 
+// indexing is deliberately absent — it is tied to the Qdrant collection and
+// cannot change after creation.
 export type PipelineUpdate = Partial<
   Pick<PipelineConfig, 'name' | 'status' | 'chunking' | 'retrieval' | 'query_translation' | 'post_retrieval'>
->;
+> & { generation?: Partial<Omit<GenerationConfig, 'prompt'>> & { prompt?: Partial<Prompt> | null } };
 
 export interface ChunkTrace {
   content: string;
@@ -208,7 +210,7 @@ export interface PipelineScores {
 }
 
 export interface BenchmarkResultResponse {
-  benchmark_id: string;
+  id: string;
   dataset_id: string;
   status: string;
   created_at: string;

@@ -6,6 +6,7 @@ import { Button } from '../../components/Button';
 import { Table, TableHead, TableRow } from '../../components/DataTable';
 import { TextArea } from '../../components/Select';
 import { IconArrowLeft, IconPencil, IconTrash, IconCheck } from '../../components/Icons';
+import { Skeleton, SkeletonStack } from '../../components/Skeleton';
 import { api } from '../../lib/api';
 import { useToast } from '../../components/Toast';
 import type { DatasetItemResponse } from '../../lib/types';
@@ -82,7 +83,16 @@ export function DatasetDetail() {
     return (
       <>
         <Topbar title="Dataset" />
-        <div className={styles.content}>Loading…</div>
+        <div className={styles.content}>
+          <SkeletonStack>
+            <Skeleton height={20} width="30%" />
+            <Skeleton height={12} width="15%" />
+            <Skeleton height={13} width="55%" />
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} height={44} />
+            ))}
+          </SkeletonStack>
+        </div>
       </>
     );
   }

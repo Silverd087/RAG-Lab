@@ -2,6 +2,7 @@ import os
 import uuid
 import pytest
 from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import MagicMock, AsyncMock
 from src.api.task import (
     update_pipeline_status,
@@ -79,24 +80,45 @@ class TestBuildBenchmarkDataset:
         mocker.patch("src.api.task.run_pipeline", AsyncMock(return_value=(result, "the answer")))
 
         golden_set = [
-            {"question": "q1", "ground_truth": "gt1"},
-            {"question": "q2", "ground_truth": "gt2"},
+            SimpleNamespace(question="q1", ground_truth="gt1"),
+            SimpleNamespace(question="q2", ground_truth="gt2"),
         ]
-        dataset = await build_benchmark_dataset(golden_set, base_config)
+        dataset, item_errors = await build_benchmark_dataset(golden_set, base_config)
         assert len(dataset.test_cases) == 2
+        assert item_errors == []
 
     async def test_test_case_maps_pipeline_output(self, mocker, base_config, fake_docs):
         result = MagicMock()
         result.chunks = [MagicMock(content=doc.page_content) for doc in fake_docs]
         mocker.patch("src.api.task.run_pipeline", AsyncMock(return_value=(result, "the answer")))
 
-        golden_set = [{"question": "q1", "ground_truth": "gt1"}]
-        dataset = await build_benchmark_dataset(golden_set, base_config)
+        golden_set = [SimpleNamespace(question="q1", ground_truth="gt1")]
+        dataset, item_errors = await build_benchmark_dataset(golden_set, base_config)
         test_case = dataset.test_cases[0]
         assert test_case.input == "q1"
         assert test_case.expected_output == "gt1"
         assert test_case.actual_output == "the answer"
         assert test_case.retrieval_context == [doc.page_content for doc in fake_docs]
+        assert item_errors == []
+
+    async def test_skips_failed_items_and_records_errors(self, mocker, base_config, fake_docs):
+        result = MagicMock()
+        result.chunks = [MagicMock(content=doc.page_content) for doc in fake_docs]
+        mocker.patch(
+            "src.api.task.run_pipeline",
+            AsyncMock(side_effect=[RuntimeError("Connection error."), (result, "the answer")]),
+        )
+
+        golden_set = [
+            SimpleNamespace(question="q1", ground_truth="gt1"),
+            SimpleNamespace(question="q2", ground_truth="gt2"),
+        ]
+        dataset, item_errors = await build_benchmark_dataset(golden_set, base_config)
+        assert len(dataset.test_cases) == 1
+        assert dataset.test_cases[0].input == "q2"
+        assert len(item_errors) == 1
+        assert "q1" in item_errors[0]
+        assert "Connection error." in item_errors[0]
 
 
 class TestIngestTask:
@@ -254,7 +276,7 @@ class TestEvaluateSinglePipeline:
 
     @pytest.fixture
     def mock_build_dataset(self, mocker):
-        return mocker.patch("src.api.task.build_benchmark_dataset", AsyncMock(return_value=MagicMock()))
+        return mocker.patch("src.api.task.build_benchmark_dataset", AsyncMock(return_value=(MagicMock(), [])))
 
     def test_returns_mean_scores_on_success(self, mocker, single_eval_db, mock_build_dataset, mock_metrics, base_config):
         mocker.patch(
@@ -278,6 +300,33 @@ class TestEvaluateSinglePipeline:
         assert result["status"] == "failed"
         assert result["scores"] is None
         assert "db down" in result["error"]
+
+    def test_reports_partial_item_failures(self, mocker, single_eval_db, mock_metrics, base_config):
+        mocker.patch(
+            "src.api.task.build_benchmark_dataset",
+            AsyncMock(return_value=(MagicMock(), ["'q1': Connection error."])),
+        )
+        mocker.patch(
+            "src.api.task.evaluate",
+            return_value=make_eval_results([[1.0, 1.0, 1.0, 1.0]]),
+        )
+        result = evaluate_single_pipeline(str(base_config.id), "dataset-id")
+        assert result["status"] == "success"
+        assert result["scores"] is not None
+        assert "1 of 2 dataset item(s) failed" in result["error"]
+        assert "Connection error." in result["error"]
+
+    def test_fails_when_all_items_fail(self, mocker, single_eval_db, mock_metrics, base_config):
+        empty_dataset = MagicMock()
+        empty_dataset.test_cases = []
+        mocker.patch(
+            "src.api.task.build_benchmark_dataset",
+            AsyncMock(return_value=(empty_dataset, ["'q1': Connection error."])),
+        )
+        result = evaluate_single_pipeline(str(base_config.id), "dataset-id")
+        assert result["status"] == "failed"
+        assert result["scores"] is None
+        assert "All 1 dataset item(s) failed" in result["error"]
 
 
 class TestAggregateBenchmarkResults:

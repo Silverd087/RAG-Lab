@@ -6,6 +6,7 @@ import { Select } from '../../components/Select';
 import { Field } from '../../components/Field';
 import { Table, TableHead, TableRow } from '../../components/DataTable';
 import { EmptyState } from '../../components/EmptyState';
+import { Skeleton, SkeletonStack } from '../../components/Skeleton';
 import { IconBenchmark } from '../../components/Icons';
 import { api } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
@@ -20,7 +21,13 @@ export function BenchmarkPage() {
   const queryClient = useQueryClient();
   const { data: pipelines } = useQuery({ queryKey: ['pipelines'], queryFn: api.listPipelines });
   const { data: datasets } = useQuery({ queryKey: ['datasets'], queryFn: api.listDatasets });
-  const { data: benchmarkList } = useQuery({ queryKey: ['benchmarks'], queryFn: api.listBenchmarks });
+  const { data: benchmarkList, isLoading: benchmarksLoading } = useQuery({
+    queryKey: ['benchmarks'],
+    queryFn: api.listBenchmarks,
+    // Keep card statuses live while any benchmark is still running
+    refetchInterval: (query) =>
+      query.state.data?.benchmarks.some((b) => !TERMINAL_STATUSES.has(b.status)) ? 3000 : false,
+  });
   const [datasetId, setDatasetId] = useState('');
   const [selectedPipelineIds, setSelectedPipelineIds] = useState<string[]>([]);
   const [openBenchmarkId, setOpenBenchmarkId] = useState<string | null>(null);
@@ -68,7 +75,16 @@ export function BenchmarkPage() {
           }
         />
         <div className={styles.content}>
-          <ResultsTable results={detail?.results ?? null} pipelineName={pipelineName} />
+          {benchmarkDetailQuery.isLoading ? (
+            <SkeletonStack>
+              <Skeleton height={14} width="30%" />
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} height={38} />
+              ))}
+            </SkeletonStack>
+          ) : (
+            <ResultsTable results={detail?.results ?? null} pipelineName={pipelineName} />
+          )}
         </div>
       </>
     );
@@ -98,6 +114,7 @@ export function BenchmarkPage() {
                   key={p.id}
                   className={styles.chip}
                   data-active={selectedPipelineIds.includes(p.id)}
+                  aria-pressed={selectedPipelineIds.includes(p.id)}
                   onClick={() => togglePipeline(p.id)}
                 >
                   {p.name}
@@ -123,7 +140,17 @@ export function BenchmarkPage() {
 
         <div>
           <div className={styles.sectionLabel}>Past benchmarks</div>
-          {pastBenchmarks.length === 0 ? (
+          {benchmarksLoading ? (
+            <div className={styles.pastGrid}>
+              {[0, 1, 2].map((i) => (
+                <SkeletonStack key={i} className={styles.pastCard}>
+                  <Skeleton height={13} width="65%" />
+                  <Skeleton height={11} width="45%" />
+                  <Skeleton height={11} width="30%" />
+                </SkeletonStack>
+              ))}
+            </div>
+          ) : pastBenchmarks.length === 0 ? (
             <EmptyState
               icon={<IconBenchmark width={20} height={20} />}
               title="No benchmarks yet"
@@ -132,7 +159,7 @@ export function BenchmarkPage() {
           ) : (
             <div className={styles.pastGrid}>
               {pastBenchmarks.map((b) => (
-                <button key={b.benchmark_id} className={styles.pastCard} onClick={() => setOpenBenchmarkId(b.benchmark_id)}>
+                <button key={b.id} className={styles.pastCard} onClick={() => setOpenBenchmarkId(b.id)}>
                   <div className={styles.pastDataset}>{datasetName(b.dataset_id)}</div>
                   <div className={styles.pastMeta}>
                     {timeAgo(b.created_at)} · {b.results?.length ?? 0} pipelines
@@ -169,6 +196,9 @@ function ResultsTable({
           <span>
             {pipelineName(r.pipeline_id)}
             {r.status === 'failed' && <span className={styles.failedTag}> — failed: {r.error}</span>}
+            {r.status === 'success' && r.error && (
+              <span className={styles.partialTag} title={r.error}> — partial: some dataset items failed</span>
+            )}
           </span>
           <span>{r.scores ? r.scores.faithfulness.toFixed(2) : '—'}</span>
           <span>{r.scores ? r.scores.answer_relevance.toFixed(2) : '—'}</span>

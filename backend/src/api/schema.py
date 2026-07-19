@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict,Field,UUID4,field_validator
 from src.rag.models import (PipelineResult,PipelineStatus,QueryTranslationConfig,
-                            ChunkingConfig,RetrievalConfig,PostRetrievalConfig,PipelineConfig)
+                            ChunkingConfig,RetrievalConfig,PostRetrievalConfig,PipelineConfig,
+                            GenerationConfig)
 from typing import Optional
 from datetime import datetime
 class CompareResponse(BaseModel):
@@ -18,12 +19,15 @@ class DocumentResponse(BaseModel):
     last_modified:Optional[datetime] = None
 
 class PipelineUpdate(BaseModel):
+    # indexing is intentionally not updatable: the Qdrant collection is built
+    # with those settings and existing vectors would no longer match.
     name: Optional[str] = Field(default=None, min_length=1)
     status: Optional[str] = None
     chunking: Optional[ChunkingConfig] = None
     retrieval: Optional[RetrievalConfig] = None
     query_translation:Optional[QueryTranslationConfig] = None
     post_retrieval:Optional[PostRetrievalConfig] = None
+    generation:Optional[GenerationConfig] = None
 
 class QueryRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)

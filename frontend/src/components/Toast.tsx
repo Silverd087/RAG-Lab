@@ -22,13 +22,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => [...prev, { id, message, color }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 2200);
+    }, 3500);
   }, []);
 
   return (
     <Ctx.Provider value={{ flash }}>
       {children}
-      <div className={styles.stack}>
+      <div className={styles.stack} role="status" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className={styles.toast}>
             <span className={styles.dot} style={{ background: t.color }} />

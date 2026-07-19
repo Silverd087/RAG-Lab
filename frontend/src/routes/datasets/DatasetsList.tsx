@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Topbar } from '../../components/Topbar';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
+import { Skeleton, SkeletonStack } from '../../components/Skeleton';
 import { IconDataset, IconPlus } from '../../components/Icons';
 import { api } from '../../lib/api';
 import { timeAgo } from '../../lib/format';
@@ -42,6 +43,17 @@ export function DatasetsList() {
         }
       />
       <div className={styles.content}>
+        {isLoading && (
+          <div className={styles.grid}>
+            {[0, 1, 2].map((i) => (
+              <SkeletonStack key={i} className={styles.card}>
+                <Skeleton height={18} width={18} />
+                <Skeleton height={14} width="60%" />
+                <Skeleton height={11} width="40%" />
+              </SkeletonStack>
+            ))}
+          </div>
+        )}
         {!isLoading && datasets && datasets.length === 0 && (
           <EmptyState
             icon={<IconDataset width={20} height={20} />}

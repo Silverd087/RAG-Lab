@@ -17,13 +17,15 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_anthropic import ChatAnthropic
 from langchain_voyageai import VoyageAIEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
+import asyncio
+import weakref
 
 
 _client: QdrantClient | None = None
 _embeddings:  dict[str, GoogleGenerativeAIEmbeddings] = {}
 _cross_encoder: dict[str,HuggingFaceCrossEncoder] = {}
 _cohere_rerank: dict[str,CohereRerank] = {}
-_llm: dict[str,ChatGoogleGenerativeAI] = {}
+_llm_per_loop: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, dict[str, ChatGoogleGenerativeAI]]" = weakref.WeakKeyDictionary()
 _prompt:dict[str,any] = {}
 _sparse_embeddings = None
 
@@ -69,14 +71,23 @@ def get_embeddings(config:PipelineConfig)->GoogleGenerativeAIEmbeddings:
 
     return _embeddings[model]
 
+def _build_llm(config:PipelineConfig)->ChatGoogleGenerativeAI:
+    if config.generation.provider == Provider.GOOGLE:
+        return ChatGoogleGenerativeAI(model=config.generation.llm,google_api_key=settings.google_api_key,max_retries=3)
+    elif config.generation.provider == Provider.ANTHROPIC:
+        return ChatAnthropic(model=config.generation.llm,anthropic_api_key=settings.anthropic_api_key,max_retries=3)
+    raise ValueError(f"Unknown generation provider {config.generation.provider}")
+
 def get_llm(config:PipelineConfig)->ChatGoogleGenerativeAI:
     model = config.generation.llm
-    if model not in _llm:
-        if config.generation.provider == Provider.GOOGLE:
-            _llm[model] = ChatGoogleGenerativeAI(model=config.generation.llm,google_api_key=settings.google_api_key)
-        elif config.generation.provider == Provider.ANTHROPIC:
-            _llm[model] = ChatAnthropic(model=config.generation.llm,anthropic_api_key=settings.anthropic_api_key)
-    return _llm[model]
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return _build_llm(config)
+    cache = _llm_per_loop.setdefault(loop, {})
+    if model not in cache:
+        cache[model] = _build_llm(config)
+    return cache[model]
 
 
 mode_map = {

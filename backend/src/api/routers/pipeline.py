@@ -5,8 +5,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select,update
 from src.database.models.pipeline import PipelineModel,PipelineStatusEnum
 import uuid
+import logging
 from pydantic import ValidationError
 from src.api.schema import PipelineUpdate
+from src.rag.core import get_client
+from src.storage.minio_client import get_minio_client
+from minio.deleteobjects import DeleteObject
+from redis import Redis
+from config import settings
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -53,7 +61,35 @@ async def delete_pipeline_by_id(id:uuid.UUID,db:AsyncSession = Depends(get_db)):
     pipeline_row = result.scalar_one_or_none()
     if not pipeline_row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"pipeline with {id} not found")
-    
+
+    # Best-effort cleanup of per-pipeline storage: a draft pipeline may have
+    # none of these yet, and a failure here shouldn't keep the DB row alive.
+    try:
+        qdrant_client = get_client()
+        qdrant_client.delete_collection(collection_name=f"collection_{id}")
+    except Exception:
+        logger.warning("Failed to delete qdrant collection for pipeline %s", id, exc_info=True)
+
+    try:
+        minio_client = get_minio_client()
+        objects = minio_client.list_objects(bucket_name=settings.minio_bucket_name,prefix=f"pipelines/{id}/",recursive=True)
+        delete_list = [DeleteObject(obj.object_name) for obj in objects]
+        # remove_objects is lazy — deletion only happens while the error
+        # iterator is consumed.
+        for error in minio_client.remove_objects(settings.minio_bucket_name, delete_list):
+            logger.warning("Failed to delete object %s for pipeline %s: %s", error.name, id, error.message)
+    except Exception:
+        logger.warning("Failed to delete minio documents for pipeline %s", id, exc_info=True)
+
+    try:
+        redis_client = Redis.from_url(settings.redis_url)
+        docstore_keys = list(redis_client.scan_iter(match=f"docstore_{id}/*"))
+        if docstore_keys:
+            redis_client.delete(*docstore_keys)
+        redis_client.close()
+    except Exception:
+        logger.warning("Failed to delete redis docstore for pipeline %s", id, exc_info=True)
+
     await db.delete(pipeline_row)
 
 
@@ -105,7 +141,7 @@ async def update_pipeline(id:uuid.UUID,payload:PipelineUpdate,db:AsyncSession=De
     if pipeline_row.status == "ingesting":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,detail=f"Pipeline configuration cannot be modified while in 'ingesting' status.")
 
-    update_data = payload.model_dump(exclude_unset=True)
+    update_data = payload.model_dump(exclude_unset=True, mode="json")
 
     for key, value in update_data.items():
         if key in ["name", "status"]:

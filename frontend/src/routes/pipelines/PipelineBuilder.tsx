@@ -45,9 +45,9 @@ const EMBEDDING_MODELS: Record<Provider, string[]> = {
 };
 
 // Backend get_llm only supports Google and Anthropic
-type GenerationProvider = Exclude<Provider, 'huggingface'>;
+export type GenerationProvider = Exclude<Provider, 'huggingface'>;
 
-const LLM_MODELS: Record<GenerationProvider, string[]> = {
+export const LLM_MODELS: Record<GenerationProvider, string[]> = {
   google: ['gemini-2.5-flash', 'gemini-2.5-pro'],
   anthropic: ['claude-sonnet-5', 'claude-haiku-4-5-20251001', 'claude-opus-4-8'],
 };

@@ -56,13 +56,14 @@
 }
 
 .icon {
-  height: 30px;
-  width: 30px;
+  height: 38px;
+  width: 38px;
+  flex-shrink: 0;
   padding: 0;
   background: var(--bg-input-alt);
   border-color: var(--border-6);
   color: var(--text-muted);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-med);
 }
 .icon:not(:disabled):hover {
   color: var(--text-primary);

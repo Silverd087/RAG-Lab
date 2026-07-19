@@ -4,3 +4,9 @@
   background-size: 200% 100%;
   animation: skel 1.4s ease infinite;
 }
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

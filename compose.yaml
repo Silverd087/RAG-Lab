@@ -146,7 +146,7 @@ services:
       timeout: 5s
       retries: 5
   qdrant:
-    image: qdrant/qdrant:v1.15.5
+    image: qdrant/qdrant:v1.18.0
     container_name: qdrant
     restart: unless-stopped
     ports:
