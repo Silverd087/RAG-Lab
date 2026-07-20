@@ -94,12 +94,30 @@ compose.yaml              # full local stack
 .github/workflows/        # backend + frontend CI (test, build, publish, GitOps bump)
 ```
 
-## Getting started
+## Setup
 
 ### Prerequisites
 
-- Docker with Compose
-- API keys: Google AI (Gemini + embeddings), Anthropic, Voyage AI (embeddings for Anthropic-provider pipelines), Cohere (reranking)
+- [Docker](https://docs.docker.com/get-docker/) with Compose (everything below runs through it; no local Python/Node install is required just to try the app)
+- API keys, one per provider you intend to use:
+  - [Google AI Studio](https://aistudio.google.com/apikey) — Gemini generation + embeddings
+  - [Anthropic Console](https://console.anthropic.com/settings/keys) — Claude generation
+  - [Voyage AI](https://dashboard.voyageai.com/api-keys) — embeddings for Anthropic-provider pipelines
+  - [Cohere](https://dashboard.cohere.com/api-keys) — reranking
+
+Only needed for **local development outside Docker** (see [Local development](#local-development)):
+
+- Python 3.13 with [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- Node.js 20+ with npm
+
+### Clone the repo
+
+```bash
+git clone https://github.com/Silverd087/RAG-Lab.git
+cd RAG-Lab
+```
+
+## Getting started
 
 ### 1. Configure environment
 
