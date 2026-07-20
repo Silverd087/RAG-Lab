@@ -17,6 +17,65 @@
 
 .pipelineStatus {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.configPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.configDetails {
+  background: var(--bg-card);
+  border: 1px solid var(--border-3);
+  border-radius: var(--radius-lg);
+  padding: 8px 10px;
+}
+
+.configSummary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.configRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border-2);
+  font-size: 11.5px;
+}
+
+.configRow:first-child {
+  margin-top: 8px;
+}
+
+.configLabel {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.configValue {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.configLink {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--brand-2);
 }
 
 .newChatBtn {

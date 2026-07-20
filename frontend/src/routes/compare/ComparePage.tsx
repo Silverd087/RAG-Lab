@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Topbar } from '../../components/Topbar';
 import { Button } from '../../components/Button';
 import { Select, Input } from '../../components/Select';
 import { Field } from '../../components/Field';
 import { ScoreBar } from '../../components/ScoreBar';
-import { Skeleton } from '../../components/Skeleton';
+import { Skeleton, SkeletonStack } from '../../components/Skeleton';
 import { EmptyState } from '../../components/EmptyState';
 import { IconCompare } from '../../components/Icons';
 import { api } from '../../lib/api';
@@ -35,22 +36,42 @@ export function ComparePage() {
   const { flash } = useToast();
   const queryClient = useQueryClient();
   const { data: pipelines } = useQuery({ queryKey: ['pipelines'], queryFn: api.listPipelines });
-  const { data: pastComparisons } = useQuery({ queryKey: ['comparisons'], queryFn: api.listComparisons });
-  const [idA, setIdA] = useState('');
+  const { data: pastComparisons, isLoading: comparisonsLoading } = useQuery({
+    queryKey: ['comparisons'],
+    queryFn: api.listComparisons,
+    // Keep rail statuses live while an evaluation is still running
+    refetchInterval: (query) =>
+      query.state.data?.some((c) => !TERMINAL_STATUSES.has(c.status)) ? 3000 : false,
+  });
+  const [searchParams] = useSearchParams();
+  const [idA, setIdA] = useState(() => searchParams.get('a') ?? '');
   const [idB, setIdB] = useState('');
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<CompareResponse | null>(null);
+  // Query text of an in-flight run, shown as a pinned active rail card until
+  // the server responds with the real comparison.
+  const [pendingQuery, setPendingQuery] = useState<string | null>(null);
 
   const readyPipelines = (pipelines ?? []).filter((p) => p.status === 'ready');
 
   const compareMutation = useMutation({
     mutationFn: () => api.compare(idA, idB, query),
     onSuccess: (res) => {
+      setPendingQuery(null);
       setResult(res);
       queryClient.invalidateQueries({ queryKey: ['comparisons'] });
     },
-    onError: (err) => flash(err instanceof Error ? err.message : 'Comparison failed', 'var(--red)'),
+    onError: (err) => {
+      setPendingQuery(null);
+      flash(err instanceof Error ? err.message : 'Comparison failed', 'var(--red)');
+    },
   });
+
+  function runComparison() {
+    setResult(null);
+    setPendingQuery(query);
+    compareMutation.mutate();
+  }
 
   const statusQuery = useQuery({
     queryKey: ['compare-status', result?.id],
@@ -86,7 +107,49 @@ export function ComparePage() {
   return (
     <>
       <Topbar title="Compare" />
-      <div className={styles.content}>
+      <div className={styles.wrap}>
+        <aside className={styles.rail}>
+          <div className={styles.railTitle}>History</div>
+          {pendingQuery !== null && (
+            <button className={styles.pastItem} data-active="true">
+              <span className={styles.pastQuery}>{pendingQuery}</span>
+              <span className={styles.pastMeta}>
+                <span className={styles.pastStatus} data-status="running">
+                  running
+                </span>
+                just now
+              </span>
+            </button>
+          )}
+          {comparisonsLoading &&
+            [0, 1, 2].map((i) => (
+              <SkeletonStack key={i} className={styles.pastItem}>
+                <Skeleton height={13} width="85%" />
+                <Skeleton height={10} width="55%" />
+              </SkeletonStack>
+            ))}
+          {!comparisonsLoading && pendingQuery === null && (!pastComparisons || pastComparisons.length === 0) && (
+            <div className={styles.railEmpty}>No comparisons yet.</div>
+          )}
+          {(pastComparisons ?? []).map((c) => (
+            <button
+              key={c.id}
+              className={styles.pastItem}
+              data-active={c.id === result?.id}
+              onClick={() => openComparison(c.id)}
+            >
+              <span className={styles.pastQuery}>{c.query}</span>
+              <span className={styles.pastMeta}>
+                <span className={styles.pastStatus} data-status={c.status}>
+                  {c.status}
+                </span>
+                {timeAgo(c.created_at)}
+              </span>
+            </button>
+          ))}
+        </aside>
+
+        <div className={styles.content}>
         <div className={styles.controlCard}>
           <div className={styles.controlRow}>
             <Field label="Pipeline A">
@@ -115,12 +178,27 @@ export function ComparePage() {
           </Field>
           <Button
             variant="primary"
-            onClick={() => compareMutation.mutate()}
+            onClick={runComparison}
             disabled={!idA || !idB || idA === idB || !query.trim() || compareMutation.isPending}
           >
             {compareMutation.isPending ? 'Running…' : 'Run comparison'}
           </Button>
         </div>
+
+        {compareMutation.isPending && (
+          <div className={styles.columns}>
+            {[0, 1].map((i) => (
+              <div key={i} className={styles.column}>
+                <Skeleton height={16} width="45%" />
+                <Skeleton height={96} />
+                <Skeleton height={11} width={90} />
+                <Skeleton height={56} />
+                <Skeleton height={11} width={90} />
+                <Skeleton height={56} />
+              </div>
+            ))}
+          </div>
+        )}
 
         {!result && !compareMutation.isPending && (
           <EmptyState
@@ -151,29 +229,7 @@ export function ComparePage() {
           </div>
         )}
 
-        {pastComparisons && pastComparisons.length > 0 && (
-          <div>
-            <div className={styles.sectionLabel}>Past comparisons</div>
-            <div className={styles.pastList}>
-              {pastComparisons.map((c) => (
-                <button
-                  key={c.id}
-                  className={styles.pastItem}
-                  data-active={c.id === result?.id}
-                  onClick={() => openComparison(c.id)}
-                >
-                  <span className={styles.pastQuery}>{c.query}</span>
-                  <span className={styles.pastMeta}>
-                    <span className={styles.pastStatus} data-status={c.status}>
-                      {c.status}
-                    </span>
-                    {timeAgo(c.created_at)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </>
   );

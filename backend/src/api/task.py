@@ -16,6 +16,7 @@ from deepeval.metrics import FaithfulnessMetric, AnswerRelevancyMetric, Contextu
 from deepeval.test_case import LLMTestCase
 from deepeval.dataset import EvaluationDataset
 from deepeval import evaluate
+from deepeval.evaluate.configs import AsyncConfig
 from deepeval.models.base_model import DeepEvalBaseLLM
 from src.rag.core import get_llm
 from sqlalchemy.orm import joinedload
@@ -25,6 +26,9 @@ import asyncio
 from src.database.models.benchmark import DatasetModel,BenchmarkModel
 from sqlalchemy.orm import joinedload
 from src.database.models.compare import ComparisonModel
+import logging
+
+logger = logging.getLogger(__name__)
 
 class LangchainModelAdapter(DeepEvalBaseLLM):
     """DeepEval only accepts its own model types; wrap the LangChain chat model
@@ -60,18 +64,25 @@ def update_pipeline_status(db:Session,pipeline_id:str,status:str,error:str=None)
 async def build_benchmark_dataset(golden_set:list,config:PipelineConfig):
 
     test_cases = []
+    item_errors = []
     for item in golden_set:
-        result,answer = await run_pipeline(config=config,query=item["question"])
 
-        test_case = LLMTestCase(input=item["question"],
-                        expected_output=item["ground_truth"],
+        try:
+            result,answer = await run_pipeline(config=config,query=item.question)
+        except Exception as e:
+            logger.exception("Pipeline %s failed on dataset item %r", config.id, item.question)
+            item_errors.append(f"{item.question!r}: {e}")
+            continue
+
+        test_case = LLMTestCase(input=item.question,
+                        expected_output=item.ground_truth,
                         actual_output=answer,
                         retrieval_context=[c.content for c in result.chunks])
 
         test_cases.append(test_case)
     dataset = EvaluationDataset()
     dataset.test_cases = test_cases
-    return dataset
+    return dataset,item_errors
 
 @shared_task(queue="ingestion")
 def ingest_task(config_dict:dict,object_name:str)->None:
@@ -159,12 +170,14 @@ def _run_deep_eval(comparison_id:str,result_id1:str,result_id2:str,config_1_dict
 
         # Contextual precision/recall need expected_output (ground truth),
         # which ad-hoc comparisons don't have — only reference-free metrics here.
+        # async_mode/run_async off: each Celery task would spin up short-lived
+        # event loops whose httpx connections can outlive them (see get_llm).
         metrics = [
-            FaithfulnessMetric(threshold=0.7, model=eval_model),
-            AnswerRelevancyMetric(threshold=0.7, model=eval_model),
+            FaithfulnessMetric(threshold=0.7, model=eval_model, async_mode=False),
+            AnswerRelevancyMetric(threshold=0.7, model=eval_model, async_mode=False),
         ]
 
-        results = evaluate(test_cases=dataset.test_cases,metrics=metrics)
+        results = evaluate(test_cases=dataset.test_cases,metrics=metrics,async_config=AsyncConfig(run_async=False))
 
         scores = []
         for test_case_result in results.test_results:
@@ -203,20 +216,26 @@ def evaluate_single_pipeline(pipeline_id:str,dataset_id:str):
             stmt = select(DatasetModel).options(joinedload(DatasetModel.items)).where(DatasetModel.id == dataset_id)
             result = db.execute(stmt)
 
-            dataset_row = result.scalar_one_or_none()
+            dataset_row = result.unique().scalar_one_or_none()
+            
 
-            dataset = asyncio.run(build_benchmark_dataset(golden_set=dataset_row.items,config=pipeline_config))
+            dataset,item_errors = asyncio.run(build_benchmark_dataset(golden_set=dataset_row.items,config=pipeline_config))
+
+        if not dataset.test_cases:
+            raise RuntimeError(f"All {len(item_errors)} dataset item(s) failed. First error: {item_errors[0]}")
 
         eval_model = LangchainModelAdapter(get_llm(pipeline_config),pipeline_config.generation.llm)
 
+        # async_mode/run_async off: each Celery task would spin up short-lived
+        # event loops whose httpx connections can outlive them (see get_llm).
         metrics = [
-            FaithfulnessMetric(threshold=0.7, model=eval_model),
-            AnswerRelevancyMetric(threshold=0.7, model=eval_model),
-            ContextualPrecisionMetric(threshold=0.7, model=eval_model),
-            ContextualRecallMetric(threshold=0.7, model=eval_model)
+            FaithfulnessMetric(threshold=0.7, model=eval_model, async_mode=False),
+            AnswerRelevancyMetric(threshold=0.7, model=eval_model, async_mode=False),
+            ContextualPrecisionMetric(threshold=0.7, model=eval_model, async_mode=False),
+            ContextualRecallMetric(threshold=0.7, model=eval_model, async_mode=False)
         ]
 
-        result = evaluate(test_cases=dataset.test_cases,metrics=metrics)
+        result = evaluate(test_cases=dataset.test_cases,metrics=metrics,async_config=AsyncConfig(run_async=False))
 
         total_faithfulness = 0.0
         total_relevance = 0.0
@@ -237,12 +256,19 @@ def evaluate_single_pipeline(pipeline_id:str,dataset_id:str):
             context_precision=round(total_precision / num_cases, 2) if num_cases > 0 else 0,
             context_recall=round(total_recall / num_cases, 2) if num_cases > 0 else 0
         )
+        error = None
+        if item_errors:
+            error = (f"{len(item_errors)} of {len(item_errors) + num_cases} dataset item(s) failed "
+                     f"and were excluded from the scores: " + " | ".join(item_errors))
+
         return  PipelineScores(
             pipeline_id=pipeline_id,
             scores=mean_scores,
-            status="success"
+            status="success",
+            error=error
         ).model_dump(mode="json")
     except Exception as e:
+        logger.exception("Evaluation failed for pipeline %s", pipeline_id)
         return  PipelineScores(
             pipeline_id=pipeline_id,
             scores=None,

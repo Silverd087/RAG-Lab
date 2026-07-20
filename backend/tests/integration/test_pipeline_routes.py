@@ -191,6 +191,15 @@ class TestDeletePipeline:
         response = await client.delete(f"/api/v1/pipelines/{random_id}")
         assert response.status_code == 404
 
+    async def test_delete_pipeline_cleans_up_storage(self,client,pipeline,mock_get_client,mock_minio_client):
+        mock_minio_client.remove_objects.return_value = []
+        response = await client.delete(f"/api/v1/pipelines/{pipeline["id"]}")
+        assert response.status_code == 204
+        mock_get_client.delete_collection.assert_called_once_with(collection_name=f"collection_{pipeline["id"]}")
+        mock_minio_client.remove_objects.assert_called_once()
+        delete_list = mock_minio_client.remove_objects.call_args.args[1]
+        assert [d.name for d in delete_list] == [o.object_name for o in mock_minio_client.list_objects.return_value]
+
     async def test_delete_pipeline_cascades_to_results(self,client,pipeline,db_session):
         response = await client.delete(f"/api/v1/pipelines/{pipeline["id"]}")
         stmt = select(PipelineResultModel).where(PipelineResultModel.pipeline_id == pipeline["id"])
@@ -223,6 +232,30 @@ class TestUpdatePipeline:
         assert data["chunking"]["strategy"] == "semantic"
         assert data["chunking"]["chunk_size"] == 1000
         assert data["name"] == "test-patch"
+
+    async def test_update_pipeline_generation_returns_200(self,client,pipeline):
+        patch_payload = {
+            "generation": {
+                "llm": "claude-opus-4-8",
+                "provider": "anthropic",
+                "streaming": False,
+                "prompt": {"prompt": "Context: {context}\nQuestion: {question}"}
+            }
+        }
+        response = await client.patch(f"/api/v1/pipelines/{pipeline["id"]}",json=patch_payload)
+        data = response.json()
+        assert response.status_code == 200
+        assert data["generation"]["llm"] == "claude-opus-4-8"
+        assert data["generation"]["provider"] == "anthropic"
+        assert data["generation"]["prompt"]["prompt"] == "Context: {context}\nQuestion: {question}"
+
+    async def test_update_pipeline_indexing_is_ignored(self,client,pipeline):
+        original = (await client.get(f"/api/v1/pipelines/{pipeline["id"]}")).json()
+        patch_payload = {"indexing": {"embedding_model": "some-other-model"}}
+        response = await client.patch(f"/api/v1/pipelines/{pipeline["id"]}",json=patch_payload)
+        data = response.json()
+        assert response.status_code == 200
+        assert data["indexing"] == original["indexing"]
 
     async def test_update_nonexistent_pipeline_returns_404(self,client):
         fake_id = uuid.uuid4()

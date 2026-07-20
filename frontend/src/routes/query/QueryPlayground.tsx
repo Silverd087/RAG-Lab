@@ -1,16 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/Button';
 import { Select } from '../../components/Select';
 import { StatusPill } from '../../components/StatusPill';
+import { ConfigPill } from '../../components/ConfigPill';
 import { TypingIndicator } from '../../components/TypingIndicator';
 import { ScoreBar } from '../../components/ScoreBar';
+import { Skeleton, SkeletonStack } from '../../components/Skeleton';
 import { IconPlus, IconThumbsDown, IconThumbsUp } from '../../components/Icons';
 import { api } from '../../lib/api';
 import { renderMarkdownLite, timeAgo } from '../../lib/format';
+import { pipelinePills, rerankerLabel } from '../../lib/pipelineLabels';
+import { randomUUID } from '../../lib/uuid';
 import { useToast } from '../../components/Toast';
-import type { ChunkTrace, PipelineResult } from '../../lib/types';
+import type { ChunkTrace, PipelineConfig, PipelineResult } from '../../lib/types';
 import styles from './QueryPlayground.module.css';
+
+const LATENCY_STEPS: { key: string; label: string }[] = [
+  { key: 'query_translation_ms', label: 'trans' },
+  { key: 'retrieval_ms', label: 'retr' },
+  { key: 'post_retrieval_ms', label: 'post' },
+  { key: 'generation_ms', label: 'gen' },
+];
+
+function fmtMs(ms: number): string {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
+}
+
+function latencySummary(latency: Record<string, number>): string {
+  const parts = LATENCY_STEPS.filter((s) => latency[s.key] != null).map(
+    (s) => `${s.label} ${fmtMs(latency[s.key])}`,
+  );
+  if (parts.length === 0) return '';
+  const total = Object.values(latency).reduce((a, b) => a + b, 0);
+  return `${parts.join(' · ')} · total ${fmtMs(total)}`;
+}
 
 interface Message {
   role: 'user' | 'assistant';
@@ -35,7 +60,8 @@ export function QueryPlayground() {
   const { flash } = useToast();
   const queryClient = useQueryClient();
   const { data: pipelines } = useQuery({ queryKey: ['pipelines'], queryFn: api.listPipelines });
-  const [pipelineId, setPipelineId] = useState<string>('');
+  const [searchParams] = useSearchParams();
+  const [pipelineId, setPipelineId] = useState<string>(() => searchParams.get('pipeline') ?? '');
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -43,7 +69,7 @@ export function QueryPlayground() {
   const activePipeline = pipelines?.find((p) => p.id === pipelineId) ?? pipelines?.[0];
   const effectivePipelineId = pipelineId || activePipeline?.id || '';
 
-  const { data: pastResults } = useQuery({
+  const { data: pastResults, isLoading: historyLoading } = useQuery({
     queryKey: ['pipeline-results', effectivePipelineId],
     queryFn: () => api.getPipelineResults(effectivePipelineId),
     enabled: !!effectivePipelineId,
@@ -107,7 +133,7 @@ export function QueryPlayground() {
     setInput('');
 
     const existingSession = allSessions.find((s) => s.id === activeSessionId && s.pipelineId === effectivePipelineId);
-    const sessionId = existingSession ? existingSession.id : crypto.randomUUID();
+    const sessionId = existingSession ? existingSession.id : randomUUID();
     setSessions((prev) => {
       let next = prev;
       if (!prev.find((s) => s.id === sessionId)) {
@@ -230,7 +256,7 @@ export function QueryPlayground() {
   return (
     <div className={styles.wrap}>
       <aside className={styles.left}>
-        <Select value={effectivePipelineId} onChange={(e) => setPipelineId(e.target.value)}>
+        <Select value={effectivePipelineId} onChange={(e) => setPipelineId(e.target.value)} aria-label="Pipeline">
           {(pipelines ?? []).map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -238,9 +264,17 @@ export function QueryPlayground() {
           ))}
         </Select>
         {activePipeline && (
-          <div className={styles.pipelineStatus}>
-            <StatusPill status={activePipeline.status} />
-          </div>
+          <>
+            <div className={styles.pipelineStatus}>
+              <StatusPill status={activePipeline.status} />
+              <span className={styles.configPills}>
+                {pipelinePills(activePipeline).map((pill) => (
+                  <ConfigPill key={pill}>{pill}</ConfigPill>
+                ))}
+              </span>
+            </div>
+            <PipelineConfigDetails pipeline={activePipeline} />
+          </>
         )}
         <Button
           variant="secondary"
@@ -251,6 +285,14 @@ export function QueryPlayground() {
           New chat
         </Button>
         <div className={styles.sessionList}>
+          {historyLoading &&
+            sessionsForPipeline.length === 0 &&
+            [0, 1, 2].map((i) => (
+              <SkeletonStack key={i} className={styles.sessionItem}>
+                <Skeleton height={13} width="85%" />
+                <Skeleton height={10} width="50%" />
+              </SkeletonStack>
+            ))}
           {sessionsForPipeline.map((s) => (
             <button
               key={s.id}
@@ -293,6 +335,7 @@ export function QueryPlayground() {
             className={styles.textarea}
             value={input}
             placeholder="Ask a question…"
+            aria-label="Ask a question"
             rows={1}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -314,6 +357,44 @@ export function QueryPlayground() {
         ))}
       </aside>
     </div>
+  );
+}
+
+function PipelineConfigDetails({ pipeline }: { pipeline: PipelineConfig }) {
+  const { chunking, indexing, query_translation, retrieval, post_retrieval, generation } = pipeline;
+  const translations =
+    [
+      query_translation.multi_query && 'multi-query',
+      query_translation.hyde && 'HyDE',
+      query_translation.step_back && 'step-back',
+    ]
+      .filter(Boolean)
+      .join(', ') || 'none';
+
+  const rows: [string, string][] = [
+    ['Chunking', `${chunking.strategy} ${chunking.chunk_size}/${chunking.overlap}${chunking.parent_doc ? ' · parent' : ''}`],
+    ['Embedding', indexing.embedding_model],
+    ['Translation', translations],
+    ['Retrieval', `${retrieval.mode} · top-${retrieval.top_k}`],
+    ['Reranker', `${rerankerLabel(post_retrieval.reranker)}${post_retrieval.top_n != null ? ` · top-${post_retrieval.top_n}` : ''}`],
+    ['LLM', generation.llm],
+  ];
+
+  return (
+    <details className={styles.configDetails}>
+      <summary className={styles.configSummary}>Configuration</summary>
+      <div>
+        {rows.map(([label, value]) => (
+          <div key={label} className={styles.configRow}>
+            <span className={styles.configLabel}>{label}</span>
+            <span className={styles.configValue}>{value}</span>
+          </div>
+        ))}
+        <Link className={styles.configLink} to={`/pipelines/${pipeline.id}`}>
+          Open pipeline →
+        </Link>
+      </div>
+    </details>
   );
 }
 
@@ -359,12 +440,7 @@ function AssistantBubble({
       {showMeta && m.result && (
         <>
           <div className={styles.assistantMeta}>
-            {m.result.latency.generation_ms != null && (
-              <>
-                Retrieved {m.result.latency.retrieval_ms ?? 0}ms · Generated{' '}
-                {((m.result.latency.generation_ms ?? 0) / 1000).toFixed(1)}s
-              </>
-            )}
+            {latencySummary(m.result.latency)}
             {m.result.chunks.length > 0 && (
               <button className={styles.sourcesToggle} onClick={onToggleSources}>
                 {m.showSources ? 'Hide sources' : 'View sources'}
@@ -393,10 +469,10 @@ function AssistantBubble({
             </div>
           )}
           <div className={styles.feedbackRow}>
-            <button className={styles.feedbackBtn} onClick={onFeedback}>
+            <button className={styles.feedbackBtn} onClick={onFeedback} aria-label="Good answer">
               <IconThumbsUp width={14} height={14} />
             </button>
-            <button className={styles.feedbackBtn} onClick={onFeedback}>
+            <button className={styles.feedbackBtn} onClick={onFeedback} aria-label="Bad answer">
               <IconThumbsDown width={14} height={14} />
             </button>
           </div>

@@ -1,25 +1,31 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Topbar } from '../../components/Topbar';
 import { Tabs } from '../../components/Tabs';
 import { StatusPill } from '../../components/StatusPill';
+import { Button } from '../../components/Button';
 import { Table, TableHead, TableRow } from '../../components/DataTable';
 import { EmptyState } from '../../components/EmptyState';
 import { ConfigPill } from '../../components/ConfigPill';
-import { IconChat, IconDocument, IconUpload } from '../../components/Icons';
+import { IconChat, IconDocument, IconPencil, IconTrash, IconUpload } from '../../components/Icons';
+import { Skeleton, SkeletonStack } from '../../components/Skeleton';
 import { api } from '../../lib/api';
 import { fileSize, timeAgo } from '../../lib/format';
 import { useToast } from '../../components/Toast';
-import type { PipelineConfig } from '../../lib/types';
+import type { PipelineConfig, PipelineUpdate } from '../../lib/types';
+import { PipelineEditForm } from './PipelineEditForm';
 import styles from './PipelineDetail.module.css';
 
 export function PipelineDetail() {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
   const { flash } = useToast();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<'documents' | 'history' | 'config'>('config');
   const [dragOver, setDragOver] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: pipeline } = useQuery({
@@ -51,6 +57,30 @@ export function PipelineDetail() {
     onError: (err) => flash(err instanceof Error ? err.message : 'Upload failed', 'var(--red)'),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (payload: PipelineUpdate) => api.updatePipeline(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipeline', id] });
+      queryClient.invalidateQueries({ queryKey: ['pipelines'] });
+      setEditing(false);
+      flash('Pipeline updated', 'var(--green)');
+    },
+    onError: (err) => flash(err instanceof Error ? err.message : 'Failed to update pipeline', 'var(--red)'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.deletePipeline(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipelines'] });
+      flash('Pipeline deleted', 'var(--green)');
+      navigate('/pipelines');
+    },
+    onError: (err) => {
+      setConfirmingDelete(false);
+      flash(err instanceof Error ? err.message : 'Failed to delete pipeline', 'var(--red)');
+    },
+  });
+
   function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     Array.from(files).forEach((f) => uploadMutation.mutate(f));
@@ -60,7 +90,29 @@ export function PipelineDetail() {
     <>
       <Topbar
         title={pipeline?.name ?? 'Pipeline'}
-        actions={pipeline && <StatusPill status={pipeline.status} />}
+        actions={
+          pipeline && (
+            <div className={styles.topbarActions}>
+              <StatusPill status={pipeline.status} />
+              {!confirmingDelete && (
+                <Button variant="danger" onClick={() => setConfirmingDelete(true)}>
+                  <IconTrash width={14} height={14} />
+                  Delete
+                </Button>
+              )}
+              {confirmingDelete && (
+                <>
+                  <Button variant="secondary" onClick={() => setConfirmingDelete(false)} disabled={deleteMutation.isPending}>
+                    Cancel
+                  </Button>
+                  <Button variant="danger" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+                    {deleteMutation.isPending ? 'Deleting…' : 'Confirm delete'}
+                  </Button>
+                </>
+              )}
+            </div>
+          )
+        }
       />
       <div className={styles.content}>
         <Tabs
@@ -103,7 +155,13 @@ export function PipelineDetail() {
               />
             </div>
 
-            {docsLoading && <div className={styles.muted}>Loading…</div>}
+            {docsLoading && (
+              <SkeletonStack>
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} height={36} />
+                ))}
+              </SkeletonStack>
+            )}
             {!docsLoading && (!docs || docs.length === 0) && (
               <EmptyState
                 icon={<IconDocument width={20} height={20} />}
@@ -131,7 +189,13 @@ export function PipelineDetail() {
 
         {tab === 'history' && (
           <div className={styles.tabBody}>
-            {resultsLoading && <div className={styles.muted}>Loading…</div>}
+            {resultsLoading && (
+              <SkeletonStack>
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} height={36} />
+                ))}
+              </SkeletonStack>
+            )}
             {!resultsLoading && (!results || results.length === 0) && (
               <EmptyState
                 icon={<IconChat width={20} height={20} />}
@@ -159,8 +223,42 @@ export function PipelineDetail() {
 
         {tab === 'config' && (
           <div className={styles.tabBody}>
-            {!pipeline && <div className={styles.muted}>Loading…</div>}
-            {pipeline && <ConfigView pipeline={pipeline} />}
+            {!pipeline && (
+              <div className={styles.configGrid}>
+                {[0, 1, 2, 3].map((i) => (
+                  <SkeletonStack key={i} className={styles.configSection}>
+                    <Skeleton height={11} width="35%" />
+                    <Skeleton height={13} />
+                    <Skeleton height={13} />
+                    <Skeleton height={13} width="70%" />
+                  </SkeletonStack>
+                ))}
+              </div>
+            )}
+            {pipeline && !editing && (
+              <>
+                <div className={styles.configActions}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setEditing(true)}
+                    disabled={pipeline.status === 'ingesting'}
+                    title={pipeline.status === 'ingesting' ? 'Cannot edit while ingesting' : undefined}
+                  >
+                    <IconPencil width={13} height={13} />
+                    Edit configuration
+                  </Button>
+                </div>
+                <ConfigView pipeline={pipeline} />
+              </>
+            )}
+            {pipeline && editing && (
+              <PipelineEditForm
+                pipeline={pipeline}
+                saving={updateMutation.isPending}
+                onSave={(payload) => updateMutation.mutate(payload)}
+                onCancel={() => setEditing(false)}
+              />
+            )}
           </div>
         )}
       </div>
