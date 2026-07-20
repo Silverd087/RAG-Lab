@@ -12,7 +12,7 @@ Deployment manifests live in the companion GitOps repo: [RAG-Lab-Infra](https://
 - **Side-by-side comparison** — ask two pipelines the same question; compare answers, per-stage latency, retrieved chunks (with "only in this pipeline" diffing), and reference-free DeepEval scores (faithfulness, answer relevancy).
 - **Golden datasets** — CRUD for question/ground-truth pairs used as benchmark references.
 - **Benchmarking** — run any number of pipelines against a dataset; a Celery chord fans out one evaluation task per pipeline and aggregates results. Scores four DeepEval metrics (faithfulness, answer relevancy, contextual precision, contextual recall) with partial-failure reporting: one failed dataset item is skipped and reported, not fatal to the run.
-- **Observability** — Prometheus metrics (`/metrics`), liveness (`/healthz`) and dependency-aware readiness (`/readyz`) endpoints.
+- **Observability** — Prometheus-format metrics (`/metrics`), liveness (`/healthz`) and dependency-aware readiness (`/readyz`) endpoints. The Compose stack only exposes these endpoints; a Prometheus + Grafana stack that scrapes them is provided separately in [RAG-Lab-Infra](https://github.com/Silverd087/RAG-Lab-Infra) for the k8s deployment.
 
 ## Architecture
 
@@ -94,12 +94,30 @@ compose.yaml              # full local stack
 .github/workflows/        # backend + frontend CI (test, build, publish, GitOps bump)
 ```
 
-## Getting started
+## Setup
 
 ### Prerequisites
 
-- Docker with Compose
-- API keys: Google AI (Gemini + embeddings), Anthropic, Voyage AI (embeddings for Anthropic-provider pipelines), Cohere (reranking)
+- [Docker](https://docs.docker.com/get-docker/) with Compose (everything below runs through it; no local Python/Node install is required just to try the app)
+- API keys, one per provider you intend to use:
+  - [Google AI Studio](https://aistudio.google.com/apikey) — Gemini generation + embeddings
+  - [Anthropic Console](https://console.anthropic.com/settings/keys) — Claude generation
+  - [Voyage AI](https://dashboard.voyageai.com/api-keys) — embeddings for Anthropic-provider pipelines
+  - [Cohere](https://dashboard.cohere.com/api-keys) — reranking
+
+Only needed for **local development outside Docker** (see [Local development](#local-development)):
+
+- Python 3.13 with [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- Node.js 20+ with npm
+
+### Clone the repo
+
+```bash
+git clone https://github.com/Silverd087/RAG-Lab.git
+cd RAG-Lab
+```
+
+## Getting started
 
 ### 1. Configure environment
 
@@ -149,7 +167,7 @@ docker compose up -d --build
 |---|---|
 | http://localhost:3000 | RAG Lab UI |
 | http://localhost:8000/docs | API docs (Swagger) |
-| http://localhost:8000/metrics | Prometheus metrics |
+| http://localhost:8000/metrics | Metrics endpoint (Prometheus text format — no Prometheus server is bundled in Compose; scrape it yourself or see [RAG-Lab-Infra](https://github.com/Silverd087/RAG-Lab-Infra)'s `monitoring/` for the Prometheus + Grafana setup used in the k8s deployment) |
 | http://localhost:9001 | MinIO console |
 | http://localhost:15672 | RabbitMQ management |
 | http://localhost:6333/dashboard | Qdrant dashboard |
