@@ -12,7 +12,7 @@ Deployment manifests live in the companion GitOps repo: [RAG-Lab-Infra](https://
 - **Side-by-side comparison** — ask two pipelines the same question; compare answers, per-stage latency, retrieved chunks (with "only in this pipeline" diffing), and reference-free DeepEval scores (faithfulness, answer relevancy).
 - **Golden datasets** — CRUD for question/ground-truth pairs used as benchmark references.
 - **Benchmarking** — run any number of pipelines against a dataset; a Celery chord fans out one evaluation task per pipeline and aggregates results. Scores four DeepEval metrics (faithfulness, answer relevancy, contextual precision, contextual recall) with partial-failure reporting: one failed dataset item is skipped and reported, not fatal to the run.
-- **Observability** — Prometheus metrics (`/metrics`), liveness (`/healthz`) and dependency-aware readiness (`/readyz`) endpoints.
+- **Observability** — Prometheus-format metrics (`/metrics`), liveness (`/healthz`) and dependency-aware readiness (`/readyz`) endpoints. The Compose stack only exposes these endpoints; a Prometheus + Grafana stack that scrapes them is provided separately in [RAG-Lab-Infra](https://github.com/Silverd087/RAG-Lab-Infra) for the k8s deployment.
 
 ## Architecture
 
@@ -167,7 +167,7 @@ docker compose up -d --build
 |---|---|
 | http://localhost:3000 | RAG Lab UI |
 | http://localhost:8000/docs | API docs (Swagger) |
-| http://localhost:8000/metrics | Prometheus metrics |
+| http://localhost:8000/metrics | Metrics endpoint (Prometheus text format — no Prometheus server is bundled in Compose; scrape it yourself or see [RAG-Lab-Infra](https://github.com/Silverd087/RAG-Lab-Infra)'s `monitoring/` for the Prometheus + Grafana setup used in the k8s deployment) |
 | http://localhost:9001 | MinIO console |
 | http://localhost:15672 | RabbitMQ management |
 | http://localhost:6333/dashboard | Qdrant dashboard |
