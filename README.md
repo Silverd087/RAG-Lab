@@ -199,6 +199,17 @@ npm run dev
 
 ## Testing
 
+Backend tests run on `pytest` with `pytest-cov` (branch coverage, `--cov-report=term-missing` + HTML):
+
+| Suite | Tests | Coverage | External deps |
+|---|---|---|---|
+| `tests/units` | 119 | 68% branch coverage of `src` | None — provider API keys and datastore creds are stubbed in `tests/conftest.py`; LLM calls go through LangChain's `FakeMessagesListChatModel` and `unittest.mock` (`MagicMock`/`AsyncMock`) instead of hitting real providers |
+| `tests/integration` | 155 | not measured standalone (needs a live `RagLabTest` Postgres to run) | Real Postgres (`RagLabTest` database, truncated between tests via an autouse fixture in `tests/integration/conftest.py`); requests go through `httpx.AsyncClient` + `ASGITransport` against the FastAPI app in-process. LLM/embedding providers are still mocked — no real API calls or costs |
+
+No mocking is shared across test runs — the mocked env vars are process-local (`os.environ.setdefault`), so unit tests never accidentally hit a real API even if real keys are present in `backend/.env`.
+
+The frontend has no automated test suite yet; `npm run build` (which runs `tsc -b`) and `npm run lint` are the current correctness gates.
+
 ```bash
 # Backend — unit tests (no external services needed; env is mocked)
 cd backend && uv run pytest tests/units
