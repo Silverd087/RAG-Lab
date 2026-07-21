@@ -32,7 +32,7 @@ flowchart LR
         PG[(Postgres<br/>configs, results,<br/>datasets, benchmarks)]
         QD[(Qdrant<br/>vectors)]
         MI[(MinIO<br/>documents)]
-        RD[(Redis<br/>parent-doc store,<br/>chat sessions)]
+        RD[(Redis<br/>parent-doc store)]
         MQ[(RabbitMQ<br/>task broker)]
     end
 
