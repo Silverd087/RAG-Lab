@@ -257,3 +257,7 @@ Two GitHub Actions workflows, path-filtered:
 - **Frontend CI** — typecheck → lint → build → same publish + GitOps bump for `raglab-frontend`.
 
 Argo CD watches the infra repo and syncs the new tags into the cluster — see the infra repo's README for the deployment side.
+
+## License
+
+Source-available under the [PolyForm Strict License 1.0.0](LICENSE) — free to use for noncommercial purposes (personal study, research, coursework, hobby projects), but redistribution, modification-sharing, and commercial use are not permitted. All commercial rights are reserved.
