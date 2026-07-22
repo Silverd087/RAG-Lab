@@ -167,7 +167,7 @@ def get_parent_doc_retriever(config,search_type=SearchType.similarity,search_kwa
         parent_splitter=parent_splitter,
         docstore=docstore,
         search_type=search_type,
-        search_kwargs=search_kwargs
+        search_kwargs=search_kwargs or {}
         )
     return base_retriever
 
