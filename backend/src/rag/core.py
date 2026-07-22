@@ -19,7 +19,7 @@ from langchain_voyageai import VoyageAIEmbeddings
 from langchain_huggingface import HuggingFaceEmbeddings
 import asyncio
 import weakref
-
+from langchain_classic.retrievers.multi_vector import SearchType
 
 _client: QdrantClient | None = None
 _embeddings:  dict[str, GoogleGenerativeAIEmbeddings] = {}
@@ -155,7 +155,7 @@ def get_splitter(config:PipelineConfig, use_parent:bool = False):
 
 
 
-def get_parent_doc_retriever(config):
+def get_parent_doc_retriever(config,search_type=SearchType.similarity,search_kwargs=None):
     vectorstore = get_vectorstore(config)
     chil_splitter = get_splitter(config,use_parent=False)
     parent_splitter = get_splitter(config,use_parent=True)
@@ -165,7 +165,9 @@ def get_parent_doc_retriever(config):
         vectorstore=vectorstore,
         child_splitter=chil_splitter,
         parent_splitter=parent_splitter,
-        docstore=docstore
+        docstore=docstore,
+        search_type=search_type,
+        search_kwargs=search_kwargs or {}
         )
     return base_retriever
 

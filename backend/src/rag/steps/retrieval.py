@@ -5,6 +5,7 @@ from config import settings
 from src.rag.core import get_parent_doc_retriever, get_embeddings
 from langchain_classic.docstore.document import Document
 import asyncio
+from langchain_classic.retrievers.multi_vector import SearchType
 
 async def retrieve(query:str|list,config:PipelineConfig)-> tuple[list,dict]:
     trace = {}
@@ -52,22 +53,29 @@ def _deduplicate_by_content(docs:list[Document])->list[Document]:
     return unique
 
 async def _parent_doc_retrieve(query:str,config:PipelineConfig)->list[Document]:
+    if config.retrieval.mode == ModeConfig.MMR:
+        base_retriever = get_parent_doc_retriever(
+            config,
+            search_type=SearchType.mmr,
+            search_kwargs={"k": config.retrieval.top_k, "fetch_k": config.retrieval.top_k * 4},
+        )
+    else:
         base_retriever = get_parent_doc_retriever(config)
-        return await base_retriever.ainvoke(query)
+    return await base_retriever.ainvoke(query)
 
 async def _mmr_doc_retrieve(query:str,config:PipelineConfig)->list[Document]:
-        vectorstore = get_vectorstore(config)
-        embeddings = get_embeddings(config)
-        embedded_query = await asyncio.to_thread(embeddings.embed_query,query)
+    vectorstore = get_vectorstore(config)
+    embeddings = get_embeddings(config)
+    embedded_query = await asyncio.to_thread(embeddings.embed_query,query)
 
-        results = await asyncio.to_thread(
-             vectorstore.max_marginal_relevance_search_with_score_by_vector,
-             embedding=embedded_query,
-             k=config.retrieval.top_k,
-             fetch_k=config.retrieval.top_k*4)
-        for doc,score in results:
-            doc.metadata["score"] = score
-        return [doc for doc, _ in results]
+    results = await asyncio.to_thread(
+        vectorstore.max_marginal_relevance_search_with_score_by_vector,
+        embedding=embedded_query,
+        k=config.retrieval.top_k,
+        fetch_k=config.retrieval.top_k*4)
+    for doc,score in results:
+        doc.metadata["score"] = score
+    return [doc for doc, _ in results]
 
 async def _standard_retrieve(query:str,config:PipelineConfig):
     vectorstore = get_vectorstore(config)
