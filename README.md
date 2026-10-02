@@ -4,6 +4,12 @@ A laboratory for building, querying, comparing, and benchmarking Retrieval-Augme
 
 Deployment manifests live in the companion GitOps repo: [RAG-Lab-Infra](https://github.com/Silverd087/RAG-Lab-Infra).
 
+## Demo
+
+https://github.com/Silverd087/RAG-Lab/raw/main/docs/demo/raglab-demo.mp4
+
+Building a pipeline (HyDE query translation, hybrid retrieval, Cohere rerank), querying it with live retrieval traces, and comparing it side by side against a baseline with per-stage latency and DeepEval scores.
+
 ## Features
 
 - **Pipeline builder** — step-by-step wizard covering all six RAG stages, with presets-compatible config stored as JSONB. Pipelines can be edited after creation (everything except indexing, which is tied to the vector collection) and deleted with full cleanup of their Qdrant collection, MinIO documents, and Redis docstore.
