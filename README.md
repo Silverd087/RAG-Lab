@@ -6,7 +6,11 @@ Deployment manifests live in the companion GitOps repo: [RAG-Lab-Infra](https://
 
 ## Demo
 
-https://github.com/Silverd087/RAG-Lab/raw/main/docs/demo/raglab-demo.mp4
+
+
+https://github.com/user-attachments/assets/3efd406a-b875-466f-bce0-ce9b769497d3
+
+
 
 Building a pipeline (HyDE query translation, hybrid retrieval, Cohere rerank), querying it with live retrieval traces, and comparing it side by side against a baseline with per-stage latency and DeepEval scores.
 
